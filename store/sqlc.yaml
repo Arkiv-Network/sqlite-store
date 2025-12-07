@@ -15,3 +15,9 @@ sql:
           - column: "numeric_attributes.value"
             go_type:
               type: "Uint64"
+          - column: "*.from_block"
+            go_type:
+              type: "Uint64"
+          - column: "*.to_block"
+            go_type:
+              type: "Uint64"
