@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
@@ -17,10 +20,20 @@ import (
 )
 
 type SQLiteStore struct {
-	db *sql.DB
+	db  *sql.DB
+	log *slog.Logger
 }
 
-func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
+func NewSQLiteStore(
+	log *slog.Logger,
+	dbPath string,
+) (*SQLiteStore, error) {
+
+	err := os.MkdirAll(filepath.Dir(dbPath), 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
@@ -32,7 +45,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	return &SQLiteStore{db: db}, nil
+	return &SQLiteStore{db: db, log: log}, nil
 }
 
 func runMigrations(db *sql.DB) error {
@@ -86,9 +99,15 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 			st := store.New(tx)
 
+			firstBlock := batch.Batch.Blocks[0].Number
+			lastBlock := batch.Batch.Blocks[len(batch.Batch.Blocks)-1].Number
+			s.log.Info("new batch", "firstBlock", firstBlock, "lastBlock", lastBlock)
+
 			for _, block := range batch.Batch.Blocks {
+
 				// blockNumber := block.Number
 				for _, operation := range block.Operations {
+
 					switch {
 					case operation.Create != nil:
 						// expiresAtBlock := blockNumber + operation.Create.BTL
@@ -145,9 +164,21 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 							}
 						}
 					}
+
 				}
 
 			}
+
+			err = st.UpsertLastBlock(ctx, int64(lastBlock))
+			if err != nil {
+				return fmt.Errorf("failed to upsert last block: %w", err)
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+
 			return nil
 		}()
 		if err != nil {

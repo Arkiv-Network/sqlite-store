@@ -1,16 +1,20 @@
 package sqlitestore
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestNewSQLiteStore_RunsMigrations(t *testing.T) {
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	store, err := NewSQLiteStore(dbPath)
+	store, err := NewSQLiteStore(logger, dbPath)
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
@@ -40,16 +44,17 @@ func TestNewSQLiteStore_RunsMigrations(t *testing.T) {
 func TestNewSQLiteStore_MigrationsIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// First open
-	store1, err := NewSQLiteStore(dbPath)
+	store1, err := NewSQLiteStore(logger, dbPath)
 	if err != nil {
 		t.Fatalf("first NewSQLiteStore failed: %v", err)
 	}
 	store1.db.Close()
 
 	// Second open should not fail (migrations already applied)
-	store2, err := NewSQLiteStore(dbPath)
+	store2, err := NewSQLiteStore(logger, dbPath)
 	if err != nil {
 		t.Fatalf("second NewSQLiteStore failed: %v", err)
 	}
@@ -69,8 +74,9 @@ func TestNewSQLiteStore_MigrationsIdempotent(t *testing.T) {
 func TestNewSQLiteStore_InvalidPath(t *testing.T) {
 	// Try to create a database in a non-existent directory
 	dbPath := "/nonexistent/directory/test.db"
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	_, err := NewSQLiteStore(dbPath)
+	_, err := NewSQLiteStore(logger, dbPath)
 	if err == nil {
 		t.Error("expected error for invalid path, got nil")
 	}
@@ -79,13 +85,14 @@ func TestNewSQLiteStore_InvalidPath(t *testing.T) {
 func TestNewSQLiteStore_FileCreated(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Verify file doesn't exist
 	if _, err := os.Stat(dbPath); !os.IsNotExist(err) {
 		t.Fatal("database file should not exist before NewSQLiteStore")
 	}
 
-	store, err := NewSQLiteStore(dbPath)
+	store, err := NewSQLiteStore(logger, dbPath)
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
