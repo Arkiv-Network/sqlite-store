@@ -118,6 +118,32 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 						if err != nil {
 							return fmt.Errorf("failed to insert payload %s at block %d txIndex %d opIndex %d: %w", operation.Create.Key.Hex(), block.Number, operation.TxIndex, operation.OpIndex, err)
 						}
+
+						for k, v := range operation.Create.StringAttributes {
+							err = st.InsertStringAttribute(ctx, store.InsertStringAttributeParams{
+								EntityKey: operation.Create.Key.Bytes(),
+								FromBlock: store.Uint64(block.Number),
+								ToBlock:   store.Uint64(block.Number + operation.Create.BTL),
+								Key:       k,
+								Value:     v,
+							})
+							if err != nil {
+								return fmt.Errorf("failed to insert string attribute %s at block %d txIndex %d opIndex %d: %w", k, block.Number, operation.TxIndex, operation.OpIndex, err)
+							}
+						}
+
+						for k, v := range operation.Create.NumericAttributes {
+							err = st.InsertNumericAttribute(ctx, store.InsertNumericAttributeParams{
+								EntityKey: operation.Create.Key.Bytes(),
+								FromBlock: store.Uint64(block.Number),
+								ToBlock:   store.Uint64(block.Number + operation.Create.BTL),
+								Key:       k,
+								Value:     store.Uint64(v),
+							})
+							if err != nil {
+								return fmt.Errorf("failed to insert numeric attribute %s at block %d txIndex %d opIndex %d: %w", k, block.Number, operation.TxIndex, operation.OpIndex, err)
+							}
+						}
 					}
 				}
 
