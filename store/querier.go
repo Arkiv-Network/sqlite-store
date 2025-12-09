@@ -14,14 +14,7 @@ type Querier interface {
 	DeleteStringAttributesBeforeBlock(ctx context.Context, fromBlock Uint64) error
 	GetCreator(ctx context.Context, arg GetCreatorParams) (string, error)
 	GetLastBlock(ctx context.Context) (int64, error)
-	GetOldNumericAttributes(ctx context.Context, arg GetOldNumericAttributesParams) ([]GetOldNumericAttributesRow, error)
-	GetOldNumericAttributesForToBlockChange(ctx context.Context, arg GetOldNumericAttributesForToBlockChangeParams) ([]GetOldNumericAttributesForToBlockChangeRow, error)
-	// ChangeOwner helper queries (complex operation implemented in Go)
-	GetOldPayloads(ctx context.Context, arg GetOldPayloadsParams) ([]GetOldPayloadsRow, error)
-	// ChangeToBlock helper queries (complex operation implemented in Go)
-	GetOldPayloadsForToBlockChange(ctx context.Context, arg GetOldPayloadsForToBlockChangeParams) ([]GetOldPayloadsForToBlockChangeRow, error)
-	GetOldStringAttributes(ctx context.Context, arg GetOldStringAttributesParams) ([]GetOldStringAttributesRow, error)
-	GetOldStringAttributesForToBlockChange(ctx context.Context, arg GetOldStringAttributesForToBlockChangeParams) ([]GetOldStringAttributesForToBlockChangeRow, error)
+	GetLatestPayload(ctx context.Context, entityKey []byte) (GetLatestPayloadRow, error)
 	InsertNumericAttribute(ctx context.Context, arg InsertNumericAttributeParams) error
 	InsertPayload(ctx context.Context, arg InsertPayloadParams) error
 	InsertStringAttribute(ctx context.Context, arg InsertStringAttributeParams) error

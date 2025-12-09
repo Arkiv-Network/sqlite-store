@@ -39,23 +39,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getLastBlockStmt, err = db.PrepareContext(ctx, getLastBlock); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastBlock: %w", err)
 	}
-	if q.getOldNumericAttributesStmt, err = db.PrepareContext(ctx, getOldNumericAttributes); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldNumericAttributes: %w", err)
-	}
-	if q.getOldNumericAttributesForToBlockChangeStmt, err = db.PrepareContext(ctx, getOldNumericAttributesForToBlockChange); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldNumericAttributesForToBlockChange: %w", err)
-	}
-	if q.getOldPayloadsStmt, err = db.PrepareContext(ctx, getOldPayloads); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldPayloads: %w", err)
-	}
-	if q.getOldPayloadsForToBlockChangeStmt, err = db.PrepareContext(ctx, getOldPayloadsForToBlockChange); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldPayloadsForToBlockChange: %w", err)
-	}
-	if q.getOldStringAttributesStmt, err = db.PrepareContext(ctx, getOldStringAttributes); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldStringAttributes: %w", err)
-	}
-	if q.getOldStringAttributesForToBlockChangeStmt, err = db.PrepareContext(ctx, getOldStringAttributesForToBlockChange); err != nil {
-		return nil, fmt.Errorf("error preparing query GetOldStringAttributesForToBlockChange: %w", err)
+	if q.getLatestPayloadStmt, err = db.PrepareContext(ctx, getLatestPayload); err != nil {
+		return nil, fmt.Errorf("error preparing query GetLatestPayload: %w", err)
 	}
 	if q.insertNumericAttributeStmt, err = db.PrepareContext(ctx, insertNumericAttribute); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertNumericAttribute: %w", err)
@@ -108,34 +93,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getLastBlockStmt: %w", cerr)
 		}
 	}
-	if q.getOldNumericAttributesStmt != nil {
-		if cerr := q.getOldNumericAttributesStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldNumericAttributesStmt: %w", cerr)
-		}
-	}
-	if q.getOldNumericAttributesForToBlockChangeStmt != nil {
-		if cerr := q.getOldNumericAttributesForToBlockChangeStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldNumericAttributesForToBlockChangeStmt: %w", cerr)
-		}
-	}
-	if q.getOldPayloadsStmt != nil {
-		if cerr := q.getOldPayloadsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldPayloadsStmt: %w", cerr)
-		}
-	}
-	if q.getOldPayloadsForToBlockChangeStmt != nil {
-		if cerr := q.getOldPayloadsForToBlockChangeStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldPayloadsForToBlockChangeStmt: %w", cerr)
-		}
-	}
-	if q.getOldStringAttributesStmt != nil {
-		if cerr := q.getOldStringAttributesStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldStringAttributesStmt: %w", cerr)
-		}
-	}
-	if q.getOldStringAttributesForToBlockChangeStmt != nil {
-		if cerr := q.getOldStringAttributesForToBlockChangeStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getOldStringAttributesForToBlockChangeStmt: %w", cerr)
+	if q.getLatestPayloadStmt != nil {
+		if cerr := q.getLatestPayloadStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getLatestPayloadStmt: %w", cerr)
 		}
 	}
 	if q.insertNumericAttributeStmt != nil {
@@ -210,26 +170,21 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                          DBTX
-	tx                                          *sql.Tx
-	deleteNumericAttributesBeforeBlockStmt      *sql.Stmt
-	deletePayloadsBeforeBlockStmt               *sql.Stmt
-	deleteStringAttributesBeforeBlockStmt       *sql.Stmt
-	getCreatorStmt                              *sql.Stmt
-	getLastBlockStmt                            *sql.Stmt
-	getOldNumericAttributesStmt                 *sql.Stmt
-	getOldNumericAttributesForToBlockChangeStmt *sql.Stmt
-	getOldPayloadsStmt                          *sql.Stmt
-	getOldPayloadsForToBlockChangeStmt          *sql.Stmt
-	getOldStringAttributesStmt                  *sql.Stmt
-	getOldStringAttributesForToBlockChangeStmt  *sql.Stmt
-	insertNumericAttributeStmt                  *sql.Stmt
-	insertPayloadStmt                           *sql.Stmt
-	insertStringAttributeStmt                   *sql.Stmt
-	terminateNumericAttributesAtBlockStmt       *sql.Stmt
-	terminatePayloadsAtBlockStmt                *sql.Stmt
-	terminateStringAttributesAtBlockStmt        *sql.Stmt
-	upsertLastBlockStmt                         *sql.Stmt
+	db                                     DBTX
+	tx                                     *sql.Tx
+	deleteNumericAttributesBeforeBlockStmt *sql.Stmt
+	deletePayloadsBeforeBlockStmt          *sql.Stmt
+	deleteStringAttributesBeforeBlockStmt  *sql.Stmt
+	getCreatorStmt                         *sql.Stmt
+	getLastBlockStmt                       *sql.Stmt
+	getLatestPayloadStmt                   *sql.Stmt
+	insertNumericAttributeStmt             *sql.Stmt
+	insertPayloadStmt                      *sql.Stmt
+	insertStringAttributeStmt              *sql.Stmt
+	terminateNumericAttributesAtBlockStmt  *sql.Stmt
+	terminatePayloadsAtBlockStmt           *sql.Stmt
+	terminateStringAttributesAtBlockStmt   *sql.Stmt
+	upsertLastBlockStmt                    *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -241,18 +196,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteStringAttributesBeforeBlockStmt:  q.deleteStringAttributesBeforeBlockStmt,
 		getCreatorStmt:                         q.getCreatorStmt,
 		getLastBlockStmt:                       q.getLastBlockStmt,
-		getOldNumericAttributesStmt:            q.getOldNumericAttributesStmt,
-		getOldNumericAttributesForToBlockChangeStmt: q.getOldNumericAttributesForToBlockChangeStmt,
-		getOldPayloadsStmt:                          q.getOldPayloadsStmt,
-		getOldPayloadsForToBlockChangeStmt:          q.getOldPayloadsForToBlockChangeStmt,
-		getOldStringAttributesStmt:                  q.getOldStringAttributesStmt,
-		getOldStringAttributesForToBlockChangeStmt:  q.getOldStringAttributesForToBlockChangeStmt,
-		insertNumericAttributeStmt:                  q.insertNumericAttributeStmt,
-		insertPayloadStmt:                           q.insertPayloadStmt,
-		insertStringAttributeStmt:                   q.insertStringAttributeStmt,
-		terminateNumericAttributesAtBlockStmt:       q.terminateNumericAttributesAtBlockStmt,
-		terminatePayloadsAtBlockStmt:                q.terminatePayloadsAtBlockStmt,
-		terminateStringAttributesAtBlockStmt:        q.terminateStringAttributesAtBlockStmt,
-		upsertLastBlockStmt:                         q.upsertLastBlockStmt,
+		getLatestPayloadStmt:                   q.getLatestPayloadStmt,
+		insertNumericAttributeStmt:             q.insertNumericAttributeStmt,
+		insertPayloadStmt:                      q.insertPayloadStmt,
+		insertStringAttributeStmt:              q.insertStringAttributeStmt,
+		terminateNumericAttributesAtBlockStmt:  q.terminateNumericAttributesAtBlockStmt,
+		terminatePayloadsAtBlockStmt:           q.terminatePayloadsAtBlockStmt,
+		terminateStringAttributesAtBlockStmt:   q.terminateStringAttributesAtBlockStmt,
+		upsertLastBlockStmt:                    q.upsertLastBlockStmt,
 	}
 }

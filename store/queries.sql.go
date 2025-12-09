@@ -69,108 +69,14 @@ func (q *Queries) GetLastBlock(ctx context.Context) (int64, error) {
 	return block, err
 }
 
-const getOldNumericAttributes = `-- name: GetOldNumericAttributes :many
-SELECT entity_key, to_block AS old_to_block, key, value
-FROM numeric_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
-`
-
-type GetOldNumericAttributesParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldNumericAttributesRow struct {
-	EntityKey  []byte
-	OldToBlock Uint64
-	Key        string
-	Value      Uint64
-}
-
-func (q *Queries) GetOldNumericAttributes(ctx context.Context, arg GetOldNumericAttributesParams) ([]GetOldNumericAttributesRow, error) {
-	rows, err := q.query(ctx, q.getOldNumericAttributesStmt, getOldNumericAttributes, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldNumericAttributesRow{}
-	for rows.Next() {
-		var i GetOldNumericAttributesRow
-		if err := rows.Scan(
-			&i.EntityKey,
-			&i.OldToBlock,
-			&i.Key,
-			&i.Value,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOldNumericAttributesForToBlockChange = `-- name: GetOldNumericAttributesForToBlockChange :many
-SELECT entity_key, key, value
-FROM numeric_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
-`
-
-type GetOldNumericAttributesForToBlockChangeParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldNumericAttributesForToBlockChangeRow struct {
-	EntityKey []byte
-	Key       string
-	Value     Uint64
-}
-
-func (q *Queries) GetOldNumericAttributesForToBlockChange(ctx context.Context, arg GetOldNumericAttributesForToBlockChangeParams) ([]GetOldNumericAttributesForToBlockChangeRow, error) {
-	rows, err := q.query(ctx, q.getOldNumericAttributesForToBlockChangeStmt, getOldNumericAttributesForToBlockChange, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldNumericAttributesForToBlockChangeRow{}
-	for rows.Next() {
-		var i GetOldNumericAttributesForToBlockChangeRow
-		if err := rows.Scan(&i.EntityKey, &i.Key, &i.Value); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOldPayloads = `-- name: GetOldPayloads :many
-SELECT entity_key, to_block AS old_to_block, payload, content_type, string_attributes, numeric_attributes
+const getLatestPayload = `-- name: GetLatestPayload :one
+SELECT from_block, to_block AS old_to_block, payload, content_type, string_attributes, numeric_attributes
 FROM payloads
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
+WHERE entity_key = ? ORDER BY from_block DESC LIMIT 1
 `
 
-type GetOldPayloadsParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldPayloadsRow struct {
-	EntityKey         []byte
+type GetLatestPayloadRow struct {
+	FromBlock         Uint64
 	OldToBlock        Uint64
 	Payload           []byte
 	ContentType       string
@@ -178,173 +84,18 @@ type GetOldPayloadsRow struct {
 	NumericAttributes string
 }
 
-// ChangeOwner helper queries (complex operation implemented in Go)
-func (q *Queries) GetOldPayloads(ctx context.Context, arg GetOldPayloadsParams) ([]GetOldPayloadsRow, error) {
-	rows, err := q.query(ctx, q.getOldPayloadsStmt, getOldPayloads, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldPayloadsRow{}
-	for rows.Next() {
-		var i GetOldPayloadsRow
-		if err := rows.Scan(
-			&i.EntityKey,
-			&i.OldToBlock,
-			&i.Payload,
-			&i.ContentType,
-			&i.StringAttributes,
-			&i.NumericAttributes,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOldPayloadsForToBlockChange = `-- name: GetOldPayloadsForToBlockChange :many
-SELECT entity_key, payload, content_type, string_attributes, numeric_attributes
-FROM payloads
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
-`
-
-type GetOldPayloadsForToBlockChangeParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldPayloadsForToBlockChangeRow struct {
-	EntityKey         []byte
-	Payload           []byte
-	ContentType       string
-	StringAttributes  string
-	NumericAttributes string
-}
-
-// ChangeToBlock helper queries (complex operation implemented in Go)
-func (q *Queries) GetOldPayloadsForToBlockChange(ctx context.Context, arg GetOldPayloadsForToBlockChangeParams) ([]GetOldPayloadsForToBlockChangeRow, error) {
-	rows, err := q.query(ctx, q.getOldPayloadsForToBlockChangeStmt, getOldPayloadsForToBlockChange, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldPayloadsForToBlockChangeRow{}
-	for rows.Next() {
-		var i GetOldPayloadsForToBlockChangeRow
-		if err := rows.Scan(
-			&i.EntityKey,
-			&i.Payload,
-			&i.ContentType,
-			&i.StringAttributes,
-			&i.NumericAttributes,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOldStringAttributes = `-- name: GetOldStringAttributes :many
-SELECT entity_key, to_block AS old_to_block, key, value
-FROM string_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
-`
-
-type GetOldStringAttributesParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldStringAttributesRow struct {
-	EntityKey  []byte
-	OldToBlock Uint64
-	Key        string
-	Value      string
-}
-
-func (q *Queries) GetOldStringAttributes(ctx context.Context, arg GetOldStringAttributesParams) ([]GetOldStringAttributesRow, error) {
-	rows, err := q.query(ctx, q.getOldStringAttributesStmt, getOldStringAttributes, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldStringAttributesRow{}
-	for rows.Next() {
-		var i GetOldStringAttributesRow
-		if err := rows.Scan(
-			&i.EntityKey,
-			&i.OldToBlock,
-			&i.Key,
-			&i.Value,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOldStringAttributesForToBlockChange = `-- name: GetOldStringAttributesForToBlockChange :many
-SELECT entity_key, key, value
-FROM string_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?
-`
-
-type GetOldStringAttributesForToBlockChangeParams struct {
-	EntityKey []byte
-	FromBlock Uint64
-	ToBlock   Uint64
-}
-
-type GetOldStringAttributesForToBlockChangeRow struct {
-	EntityKey []byte
-	Key       string
-	Value     string
-}
-
-func (q *Queries) GetOldStringAttributesForToBlockChange(ctx context.Context, arg GetOldStringAttributesForToBlockChangeParams) ([]GetOldStringAttributesForToBlockChangeRow, error) {
-	rows, err := q.query(ctx, q.getOldStringAttributesForToBlockChangeStmt, getOldStringAttributesForToBlockChange, arg.EntityKey, arg.FromBlock, arg.ToBlock)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetOldStringAttributesForToBlockChangeRow{}
-	for rows.Next() {
-		var i GetOldStringAttributesForToBlockChangeRow
-		if err := rows.Scan(&i.EntityKey, &i.Key, &i.Value); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetLatestPayload(ctx context.Context, entityKey []byte) (GetLatestPayloadRow, error) {
+	row := q.queryRow(ctx, q.getLatestPayloadStmt, getLatestPayload, entityKey)
+	var i GetLatestPayloadRow
+	err := row.Scan(
+		&i.FromBlock,
+		&i.OldToBlock,
+		&i.Payload,
+		&i.ContentType,
+		&i.StringAttributes,
+		&i.NumericAttributes,
+	)
+	return i, err
 }
 
 const insertNumericAttribute = `-- name: InsertNumericAttribute :exec
@@ -443,49 +194,52 @@ func (q *Queries) InsertStringAttribute(ctx context.Context, arg InsertStringAtt
 const terminateNumericAttributesAtBlock = `-- name: TerminateNumericAttributesAtBlock :exec
 UPDATE numeric_attributes
 SET to_block = ?1
-WHERE entity_key = ?2 AND from_block <= ?1 AND to_block > ?1
+WHERE entity_key = ?2 AND from_block = ?3
 `
 
 type TerminateNumericAttributesAtBlockParams struct {
 	ToBlock   Uint64
 	EntityKey []byte
+	FromBlock Uint64
 }
 
 func (q *Queries) TerminateNumericAttributesAtBlock(ctx context.Context, arg TerminateNumericAttributesAtBlockParams) error {
-	_, err := q.exec(ctx, q.terminateNumericAttributesAtBlockStmt, terminateNumericAttributesAtBlock, arg.ToBlock, arg.EntityKey)
+	_, err := q.exec(ctx, q.terminateNumericAttributesAtBlockStmt, terminateNumericAttributesAtBlock, arg.ToBlock, arg.EntityKey, arg.FromBlock)
 	return err
 }
 
 const terminatePayloadsAtBlock = `-- name: TerminatePayloadsAtBlock :exec
 UPDATE payloads
 SET to_block = ?1
-WHERE entity_key = ?2 AND from_block <= ?1 AND to_block > ?1
+WHERE entity_key = ?2 AND from_block = ?3
 `
 
 type TerminatePayloadsAtBlockParams struct {
 	ToBlock   Uint64
 	EntityKey []byte
+	FromBlock Uint64
 }
 
 // TerminateEntityAtBlock is split into 3 separate queries for SQLite compatibility
 func (q *Queries) TerminatePayloadsAtBlock(ctx context.Context, arg TerminatePayloadsAtBlockParams) error {
-	_, err := q.exec(ctx, q.terminatePayloadsAtBlockStmt, terminatePayloadsAtBlock, arg.ToBlock, arg.EntityKey)
+	_, err := q.exec(ctx, q.terminatePayloadsAtBlockStmt, terminatePayloadsAtBlock, arg.ToBlock, arg.EntityKey, arg.FromBlock)
 	return err
 }
 
 const terminateStringAttributesAtBlock = `-- name: TerminateStringAttributesAtBlock :exec
 UPDATE string_attributes
 SET to_block = ?1
-WHERE entity_key = ?2 AND from_block <= ?1 AND to_block > ?1
+WHERE entity_key = ?2 AND from_block = ?3
 `
 
 type TerminateStringAttributesAtBlockParams struct {
 	ToBlock   Uint64
 	EntityKey []byte
+	FromBlock Uint64
 }
 
 func (q *Queries) TerminateStringAttributesAtBlock(ctx context.Context, arg TerminateStringAttributesAtBlockParams) error {
-	_, err := q.exec(ctx, q.terminateStringAttributesAtBlockStmt, terminateStringAttributesAtBlock, arg.ToBlock, arg.EntityKey)
+	_, err := q.exec(ctx, q.terminateStringAttributesAtBlockStmt, terminateStringAttributesAtBlock, arg.ToBlock, arg.EntityKey, arg.FromBlock)
 	return err
 }
 

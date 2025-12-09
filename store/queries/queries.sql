@@ -57,46 +57,45 @@ LIMIT 1;
 -- name: TerminatePayloadsAtBlock :exec
 UPDATE payloads
 SET to_block = sqlc.arg(to_block)
-WHERE entity_key = sqlc.arg(entity_key) AND from_block <= sqlc.arg(to_block) AND to_block > sqlc.arg(to_block);
+WHERE entity_key = sqlc.arg(entity_key) AND from_block = sqlc.arg(from_block);
 
 -- name: TerminateStringAttributesAtBlock :exec
 UPDATE string_attributes
 SET to_block = sqlc.arg(to_block)
-WHERE entity_key = sqlc.arg(entity_key) AND from_block <= sqlc.arg(to_block) AND to_block > sqlc.arg(to_block);
+WHERE entity_key = sqlc.arg(entity_key) AND from_block = sqlc.arg(from_block);
 
 -- name: TerminateNumericAttributesAtBlock :exec
 UPDATE numeric_attributes
 SET to_block = sqlc.arg(to_block)
-WHERE entity_key = sqlc.arg(entity_key) AND from_block <= sqlc.arg(to_block) AND to_block > sqlc.arg(to_block);
+WHERE entity_key = sqlc.arg(entity_key) AND from_block = sqlc.arg(from_block);
 
--- ChangeOwner helper queries (complex operation implemented in Go)
--- name: GetOldPayloads :many
-SELECT entity_key, to_block AS old_to_block, payload, content_type, string_attributes, numeric_attributes
+-- name: GetLatestPayload :one
+SELECT from_block, to_block AS old_to_block, payload, content_type, string_attributes, numeric_attributes
 FROM payloads
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+WHERE entity_key = ? ORDER BY from_block DESC LIMIT 1;
 
--- name: GetOldStringAttributes :many
-SELECT entity_key, to_block AS old_to_block, key, value
-FROM string_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+-- -- name: GetOldStringAttributes :many
+-- SELECT entity_key, to_block AS old_to_block, key, value
+-- FROM string_attributes
+-- WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
 
--- name: GetOldNumericAttributes :many
-SELECT entity_key, to_block AS old_to_block, key, value
-FROM numeric_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+-- -- name: GetOldNumericAttributes :many
+-- SELECT entity_key, to_block AS old_to_block, key, value
+-- FROM numeric_attributes
+-- WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
 
--- ChangeToBlock helper queries (complex operation implemented in Go)
--- name: GetOldPayloadsForToBlockChange :many
-SELECT entity_key, payload, content_type, string_attributes, numeric_attributes
-FROM payloads
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+-- -- ChangeToBlock helper queries (complex operation implemented in Go)
+-- -- name: GetOldPayloadsForToBlockChange :many
+-- SELECT entity_key, payload, content_type, string_attributes, numeric_attributes
+-- FROM payloads
+-- WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
 
--- name: GetOldStringAttributesForToBlockChange :many
-SELECT entity_key, key, value
-FROM string_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+-- -- name: GetOldStringAttributesForToBlockChange :many
+-- SELECT entity_key, key, value
+-- FROM string_attributes
+-- WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
 
--- name: GetOldNumericAttributesForToBlockChange :many
-SELECT entity_key, key, value
-FROM numeric_attributes
-WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
+-- -- name: GetOldNumericAttributesForToBlockChange :many
+-- SELECT entity_key, key, value
+-- FROM numeric_attributes
+-- WHERE entity_key = ? AND from_block <= ? AND to_block > ?;
