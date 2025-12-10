@@ -20,6 +20,8 @@ import (
 
 	arkivevents "github.com/Arkiv-Network/arkiv-events"
 	"github.com/Arkiv-Network/arkiv-events/events"
+	query "github.com/Arkiv-Network/query-api/query"
+	"github.com/Arkiv-Network/query-api/sqlstore"
 	"github.com/Arkiv-Network/sqlite-store/store"
 )
 
@@ -584,4 +586,24 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 	}
 
 	return nil
+}
+
+func (s *SQLiteStore) QueryEntities(
+	ctx context.Context,
+	log *slog.Logger,
+	queryStr string,
+	options *query.Options,
+) (*query.QueryResponse, error) {
+	store := sqlstore.NewSQLStoreFromDB(s.db, log)
+
+	response, err := store.QueryEntities(
+		ctx,
+		queryStr,
+		options,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error calling query API: %w", err)
+	}
+
+	return response, nil
 }
