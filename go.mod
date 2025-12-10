@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/Arkiv-Network/arkiv-events v0.0.1
-	github.com/Arkiv-Network/query-api v0.0.5
+	github.com/Arkiv-Network/query-api v0.0.6
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/mattn/go-sqlite3 v1.14.32
@@ -91,5 +91,3 @@ require (
 )
 
 tool github.com/sqlc-dev/sqlc/cmd/sqlc
-
-replace github.com/Arkiv-Network/query-api => ../query-api
