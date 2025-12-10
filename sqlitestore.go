@@ -590,16 +590,17 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 func (s *SQLiteStore) QueryEntities(
 	ctx context.Context,
-	log *slog.Logger,
 	queryStr string,
 	options *query.Options,
+	sqlDialect string,
 ) (*query.QueryResponse, error) {
-	store := sqlstore.NewSQLStoreFromDB(s.db, log)
+	store := sqlstore.NewSQLStoreFromDB(s.db, s.log)
 
 	response, err := store.QueryEntities(
 		ctx,
 		queryStr,
 		options,
+		sqlDialect,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error calling query API: %w", err)
