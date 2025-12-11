@@ -234,7 +234,7 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 						err = st.TerminateNumericAttributesAtBlock(ctx, store.TerminateNumericAttributesAtBlockParams{
 							EntityKey: key,
-							ToBlock:   store.Uint64(block.Number + operation.Update.BTL),
+							ToBlock:   store.Uint64(block.Number),
 							FromBlock: latestFromBlock,
 						})
 						if err != nil {
@@ -243,7 +243,7 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 						err = st.TerminateStringAttributesAtBlock(ctx, store.TerminateStringAttributesAtBlockParams{
 							EntityKey: key,
-							ToBlock:   store.Uint64(block.Number + operation.Update.BTL),
+							ToBlock:   store.Uint64(block.Number),
 							FromBlock: latestFromBlock,
 						})
 						if err != nil {
@@ -252,7 +252,7 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 						err = st.TerminatePayloadsAtBlock(ctx, store.TerminatePayloadsAtBlockParams{
 							EntityKey: key,
-							ToBlock:   store.Uint64(block.Number + operation.Update.BTL),
+							ToBlock:   store.Uint64(block.Number),
 							FromBlock: latestFromBlock,
 						})
 						if err != nil {
