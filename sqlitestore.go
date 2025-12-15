@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,8 +27,9 @@ import (
 )
 
 type SQLiteStore struct {
-	db  *sql.DB
-	log *slog.Logger
+	writePool *sql.DB
+	readPool  *sql.DB
+	log       *slog.Logger
 }
 
 func NewSQLiteStore(
@@ -40,18 +42,35 @@ func NewSQLiteStore(
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	db, err := sql.Open("sqlite3", dbPath)
+	writeURL := fmt.Sprintf("file:%s?mode=rwc&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=immediate&_cache_size=1000000000", dbPath)
+
+	writePool, err := sql.Open("sqlite3", writeURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open write pool: %w", err)
 	}
 
-	err = runMigrations(db)
+	readURL := fmt.Sprintf("file:%s?_query_only=true&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=deferred&_cache_size=1000000000", dbPath)
+	readPool, err := sql.Open("sqlite3", readURL)
 	if err != nil {
-		db.Close()
+		return nil, fmt.Errorf("failed to open read pool: %w", err)
+	}
+
+	// we expect this to be disk-bound, so we can use a lot of threads
+	numThreads := runtime.NumCPU() * 5
+
+	readPool.SetMaxOpenConns(numThreads)
+	readPool.SetMaxIdleConns(numThreads)
+	readPool.SetConnMaxLifetime(0)
+	readPool.SetConnMaxIdleTime(0)
+
+	err = runMigrations(writePool)
+	if err != nil {
+		writePool.Close()
+		readPool.Close()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	return &SQLiteStore{db: db, log: log}, nil
+	return &SQLiteStore{writePool: writePool, readPool: readPool, log: log}, nil
 }
 
 func runMigrations(db *sql.DB) error {
@@ -78,11 +97,11 @@ func runMigrations(db *sql.DB) error {
 }
 
 func (s *SQLiteStore) Close() error {
-	return s.db.Close()
+	return s.writePool.Close()
 }
 
 func (s *SQLiteStore) GetLastBlock(ctx context.Context) (int64, error) {
-	return store.New(s.db).GetLastBlock(ctx)
+	return store.New(s.writePool).GetLastBlock(ctx)
 }
 
 func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.BatchIterator) error {
@@ -94,7 +113,7 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 
 		err := func() error {
 
-			tx, err := s.db.BeginTx(ctx, &sql.TxOptions{
+			tx, err := s.writePool.BeginTx(ctx, &sql.TxOptions{
 				Isolation: sql.LevelSerializable,
 				ReadOnly:  false,
 			})
@@ -594,7 +613,7 @@ func (s *SQLiteStore) QueryEntities(
 	options *query.Options,
 	sqlDialect string,
 ) (*query.QueryResponse, error) {
-	store := sqlstore.NewSQLStoreFromDB(s.db, s.log)
+	store := sqlstore.NewSQLStoreFromDB(s.readPool, s.log)
 
 	response, err := store.QueryEntities(
 		ctx,
