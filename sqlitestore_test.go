@@ -18,13 +18,13 @@ func TestNewSQLiteStore_RunsMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
-	defer store.db.Close()
+	defer store.writePool.Close()
 
 	// Verify tables exist by querying them
 	tables := []string{"string_attributes", "numeric_attributes", "payloads", "last_block"}
 	for _, table := range tables {
 		var name string
-		err := store.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
+		err := store.writePool.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
 		if err != nil {
 			t.Errorf("table %s not found: %v", table, err)
 		}
@@ -32,7 +32,7 @@ func TestNewSQLiteStore_RunsMigrations(t *testing.T) {
 
 	// Verify last_block has initial row
 	var block int64
-	err = store.db.QueryRow("SELECT block FROM last_block WHERE id = 1").Scan(&block)
+	err = store.writePool.QueryRow("SELECT block FROM last_block WHERE id = 1").Scan(&block)
 	if err != nil {
 		t.Fatalf("failed to query last_block: %v", err)
 	}
@@ -51,18 +51,18 @@ func TestNewSQLiteStore_MigrationsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first NewSQLiteStore failed: %v", err)
 	}
-	store1.db.Close()
+	store1.writePool.Close()
 
 	// Second open should not fail (migrations already applied)
 	store2, err := NewSQLiteStore(logger, dbPath)
 	if err != nil {
 		t.Fatalf("second NewSQLiteStore failed: %v", err)
 	}
-	defer store2.db.Close()
+	defer store2.writePool.Close()
 
 	// Verify tables still exist
 	var count int
-	err = store2.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('string_attributes', 'numeric_attributes', 'payloads', 'last_block')").Scan(&count)
+	err = store2.writePool.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('string_attributes', 'numeric_attributes', 'payloads', 'last_block')").Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to count tables: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestNewSQLiteStore_FileCreated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
-	defer store.db.Close()
+	defer store.writePool.Close()
 
 	// Verify file was created
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
