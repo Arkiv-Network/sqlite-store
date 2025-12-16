@@ -128,8 +128,18 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 			lastBlock := batch.Batch.Blocks[len(batch.Batch.Blocks)-1].Number
 			s.log.Info("new batch", "firstBlock", firstBlock, "lastBlock", lastBlock)
 
+			lastBlockFromDB, err := st.GetLastBlock(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get last block from database: %w", err)
+			}
+
 		mainLoop:
 			for _, block := range batch.Batch.Blocks {
+
+				if block.Number <= uint64(lastBlockFromDB) {
+					s.log.Info("skipping block", "block", block.Number, "lastBlockFromDB", lastBlockFromDB)
+					continue mainLoop
+				}
 
 				updatesMap := map[common.Hash][]*events.OPUpdate{}
 
