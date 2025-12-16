@@ -14,7 +14,7 @@ func TestNewSQLiteStore_RunsMigrations(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	store, err := NewSQLiteStore(logger, dbPath)
+	store, err := NewSQLiteStore(logger, dbPath, 3)
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
@@ -47,14 +47,14 @@ func TestNewSQLiteStore_MigrationsIdempotent(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// First open
-	store1, err := NewSQLiteStore(logger, dbPath)
+	store1, err := NewSQLiteStore(logger, dbPath, 3)
 	if err != nil {
 		t.Fatalf("first NewSQLiteStore failed: %v", err)
 	}
 	store1.writePool.Close()
 
 	// Second open should not fail (migrations already applied)
-	store2, err := NewSQLiteStore(logger, dbPath)
+	store2, err := NewSQLiteStore(logger, dbPath, 3)
 	if err != nil {
 		t.Fatalf("second NewSQLiteStore failed: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestNewSQLiteStore_InvalidPath(t *testing.T) {
 	dbPath := "/nonexistent/directory/test.db"
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	_, err := NewSQLiteStore(logger, dbPath)
+	_, err := NewSQLiteStore(logger, dbPath, 3)
 	if err == nil {
 		t.Error("expected error for invalid path, got nil")
 	}
@@ -92,7 +92,7 @@ func TestNewSQLiteStore_FileCreated(t *testing.T) {
 		t.Fatal("database file should not exist before NewSQLiteStore")
 	}
 
-	store, err := NewSQLiteStore(logger, dbPath)
+	store, err := NewSQLiteStore(logger, dbPath, 3)
 	if err != nil {
 		t.Fatalf("NewSQLiteStore failed: %v", err)
 	}
