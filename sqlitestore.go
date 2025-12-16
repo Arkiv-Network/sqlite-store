@@ -10,7 +10,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -35,6 +34,7 @@ type SQLiteStore struct {
 func NewSQLiteStore(
 	log *slog.Logger,
 	dbPath string,
+	numberOfReadThreads int,
 ) (*SQLiteStore, error) {
 
 	err := os.MkdirAll(filepath.Dir(dbPath), 0755)
@@ -42,24 +42,21 @@ func NewSQLiteStore(
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	writeURL := fmt.Sprintf("file:%s?mode=rwc&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=immediate&_cache_size=131072&cache=shared", dbPath)
+	writeURL := fmt.Sprintf("file:%s?mode=rwc&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=immediate&_cache_size=65536", dbPath)
 
 	writePool, err := sql.Open("sqlite3", writeURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open write pool: %w", err)
 	}
 
-	readURL := fmt.Sprintf("file:%s?_query_only=true&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=deferred&_cache_size=262144&cache=shared", dbPath)
+	readURL := fmt.Sprintf("file:%s?_query_only=true&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=deferred&_cache_size=65536", dbPath)
 	readPool, err := sql.Open("sqlite3", readURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open read pool: %w", err)
 	}
 
-	// we expect this to be disk-bound, so we can use a lot of threads
-	numThreads := runtime.NumCPU() * 5
-
-	readPool.SetMaxOpenConns(numThreads)
-	readPool.SetMaxIdleConns(numThreads)
+	readPool.SetMaxOpenConns(numberOfReadThreads)
+	readPool.SetMaxIdleConns(numberOfReadThreads)
 	readPool.SetConnMaxLifetime(0)
 	readPool.SetConnMaxIdleTime(0)
 
