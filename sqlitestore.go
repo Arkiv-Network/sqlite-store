@@ -42,14 +42,14 @@ func NewSQLiteStore(
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	writeURL := fmt.Sprintf("file:%s?mode=rwc&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=immediate&_cache_size=1000000000", dbPath)
+	writeURL := fmt.Sprintf("file:%s?mode=rwc&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=immediate&_cache_size=131072&cache=shared", dbPath)
 
 	writePool, err := sql.Open("sqlite3", writeURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open write pool: %w", err)
 	}
 
-	readURL := fmt.Sprintf("file:%s?_query_only=true&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=deferred&_cache_size=1000000000", dbPath)
+	readURL := fmt.Sprintf("file:%s?_query_only=true&_busy_timeout=11000&_journal_mode=WAL&_auto_vacuum=incremental&_foreign_keys=true&_txlock=deferred&_cache_size=262144&cache=shared", dbPath)
 	readPool, err := sql.Open("sqlite3", readURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open read pool: %w", err)
