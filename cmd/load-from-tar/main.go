@@ -10,9 +10,8 @@ import (
 	"syscall"
 
 	arkivevents "github.com/Arkiv-Network/arkiv-events"
-	"github.com/Arkiv-Network/arkiv-events/rpciterator"
+	"github.com/Arkiv-Network/arkiv-events/tariterator"
 	sqlitestore "github.com/Arkiv-Network/sqlite-store"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,20 +20,13 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := struct {
-		nodeURL string
-		dbPath  string
+		dbPath string
 	}{}
 
 	app := &cli.App{
 		Name:  "load-from-node",
 		Usage: "Load data from a node into a SQLite database",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "node-url",
-				Value:       "http://localhost:8545",
-				Destination: &cfg.nodeURL,
-				EnvVars:     []string{"NODE_URL"},
-			},
 			&cli.PathFlag{
 				Name:        "db-path",
 				Value:       "arkiv-data.db",
@@ -43,6 +35,18 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+
+			tarFileName := c.Args().First()
+
+			if tarFileName == "" {
+				return fmt.Errorf("tar file is required")
+			}
+
+			tarFile, err := os.Open(tarFileName)
+			if err != nil {
+				return fmt.Errorf("failed to open tar file: %w", err)
+			}
+			defer tarFile.Close()
 
 			store, err := sqlitestore.NewSQLiteStore(logger, cfg.dbPath, 7)
 			if err != nil {
@@ -53,20 +57,7 @@ func main() {
 			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			lastBlock, err := store.GetLastBlock(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get last block: %w", err)
-			}
-
-			logger.Info("last block", "block", lastBlock)
-
-			rpcClient, err := rpc.DialContext(ctx, cfg.nodeURL)
-			if err != nil {
-				return fmt.Errorf("failed to dial RPC client: %w", err)
-			}
-			defer rpcClient.Close()
-
-			iterator := rpciterator.IterateBlocks(ctx, logger, rpcClient, uint64(lastBlock+1))
+			iterator := tariterator.IterateTar(200, tarFile)
 
 			err = store.FollowEvents(ctx, arkivevents.BatchIterator(iterator))
 			if err != nil {
