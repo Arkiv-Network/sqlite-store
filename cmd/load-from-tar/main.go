@@ -24,7 +24,7 @@ func main() {
 	}{}
 
 	app := &cli.App{
-		Name:  "load-from-node",
+		Name:  "load-from-tar",
 		Usage: "Load data from a node into a SQLite database",
 		Flags: []cli.Flag{
 			&cli.PathFlag{
