@@ -26,7 +26,7 @@ func main() {
 	}{}
 
 	app := &cli.App{
-		Name:  "load-from-node",
+		Name:  "query",
 		Usage: "Load data from a node into a SQLite database",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
