@@ -7,6 +7,7 @@ import (
 
 func (b *QueryBuilder) createLeafQuery(query string) string {
 	tableName := b.nextTableName()
+
 	b.writeComma()
 	b.queryBuilder.WriteString(tableName)
 	b.queryBuilder.WriteString(" AS (")
@@ -131,7 +132,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 	}
 
 	blockArg := builder.pushArgument(builder.options.AtBlock)
-	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block", blockArg)
+	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
 	builder.queryBuilder.WriteString(" ORDER BY ")
 

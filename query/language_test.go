@@ -642,6 +642,112 @@ func TestParse(t *testing.T) {
 		)
 	})
 
+	// (n1 || (n2 && (n3 && (n5 || n4))))
+	// (n1 || (n2 && (n3 && n5) || (n3 && n4))))
+	// (n1 || ((n2 && n3 && n5) || (n2 && n3 && n4)))
+	// n1 || (n2 && n3 && n5) || (n2 && n3 && n4)
+	t.Run("nested parentheses", func(t *testing.T) {
+		v, err := Parse(`(n1 = 1 || (n2 = 2 && (n3 = 3 && (n5 = 5 || n4 = 4))))`, log)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			&TopLevel{
+				Expression: &Expression{
+					Or: OrExpression{
+						Left: AndExpression{
+							Left: EqualExpr{
+								Assign: &Equality{
+									Var:   "n1",
+									IsNot: false,
+									Value: Value{
+										Number: pointerOf(uint64(1)),
+									},
+								},
+							},
+						},
+						Right: []*OrRHS{
+							{
+								Expr: AndExpression{
+									Left: EqualExpr{
+										Assign: &Equality{
+											Var:   "n2",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(2)),
+											},
+										},
+									},
+									Right: []*AndRHS{
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "n3",
+													IsNot: false,
+													Value: Value{
+														Number: pointerOf(uint64(3)),
+													},
+												},
+											},
+										},
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "n5",
+													IsNot: false,
+													Value: Value{
+														Number: pointerOf(uint64(5)),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Expr: AndExpression{
+									Left: EqualExpr{
+										Assign: &Equality{
+											Var:   "n2",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(2)),
+											},
+										},
+									},
+									Right: []*AndRHS{
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "n3",
+													IsNot: false,
+													Value: Value{
+														Number: pointerOf(uint64(3)),
+													},
+												},
+											},
+										},
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "n4",
+													IsNot: false,
+													Value: Value{
+														Number: pointerOf(uint64(4)),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			v,
+		)
+	})
+
 	// (n || n2) && (n3 && n5) || n4
 	// ( (n || n2) && n3 && n5 ) || n4
 	// ( n && n3 && n5 ) || ( n2 && n3 && n5 ) || n4

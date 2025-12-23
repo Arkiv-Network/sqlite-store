@@ -288,11 +288,7 @@ type AndRHS struct {
 
 func (e *AndRHS) Normalise() []EqualExpr {
 	terms := []EqualExpr{}
-
-	for _, expr := range e.Expr.Normalise() {
-		terms = append(terms, expr)
-	}
-
+	terms = append(terms, e.Expr.Normalise()...)
 	return terms
 }
 
