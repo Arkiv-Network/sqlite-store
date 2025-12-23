@@ -2,6 +2,7 @@ package query
 
 import (
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/participle/v2"
@@ -102,15 +103,22 @@ type OrExpression struct {
 func (e *OrExpression) Normalise() *OrExpression {
 	var newRight []*OrRHS = nil
 
-	if e.Right != nil {
-		newRight = make([]*OrRHS, 0, len(e.Right))
-		for _, rhs := range e.Right {
-			newRight = append(newRight, rhs.Normalise())
+	exprs := e.Left.Normalise()
+	for _, rhs := range e.Right {
+		exprs = append(exprs, rhs.Normalise()...)
+	}
+
+	for _, rhs := range exprs[1:] {
+		if newRight == nil {
+			newRight = []*OrRHS{}
 		}
+		newRight = append(newRight, &OrRHS{
+			Expr: rhs,
+		})
 	}
 
 	return &OrExpression{
-		Left:  *e.Left.Normalise(),
+		Left:  exprs[0],
 		Right: newRight,
 	}
 }
@@ -145,10 +153,8 @@ type OrRHS struct {
 	Expr AndExpression `parser:"(Or | 'OR' | 'or') @@"`
 }
 
-func (e *OrRHS) Normalise() *OrRHS {
-	return &OrRHS{
-		Expr: *e.Expr.Normalise(),
-	}
+func (e *OrRHS) Normalise() []AndExpression {
+	return e.Expr.Normalise()
 }
 
 func (e *OrRHS) invert() *AndRHS {
@@ -170,20 +176,89 @@ type AndExpression struct {
 	Right []*AndRHS `parser:"@@*"`
 }
 
-func (e *AndExpression) Normalise() *AndExpression {
-	var newRight []*AndRHS = nil
+func (e *AndExpression) Normalise() []AndExpression {
+
+	terms := e.Left.Normalise()
 
 	if e.Right != nil {
-		newRight = make([]*AndRHS, 0, len(e.Right))
 		for _, rhs := range e.Right {
-			newRight = append(newRight, rhs.Normalise())
+			terms = append(terms, rhs.Normalise()...)
 		}
 	}
 
-	return &AndExpression{
-		Left:  *e.Left.Normalise(),
-		Right: newRight,
+	// At this point, every term is either:
+	// * a paren containing a disjunction with multiple conjunctions
+	// * a simple expression (no paren)
+	//
+	// The case of a paren containing a disjunction with a single
+	// conjunction already gets simplified when we normalise such parens.
+
+	exprs := [][][]EqualExpr{}
+	for _, term := range terms {
+
+		es := [][]EqualExpr{}
+
+		if term.Paren != nil {
+			// This paren should always be a disjunction with at least 2 terms,
+			// since the paren was already normalised
+			if len(term.Paren.Nested.Or.Right) == 0 {
+				panic("AndExpression::Normalise: unnormalised paren: this is a bug! ")
+			}
+
+			ts := []EqualExpr{term.Paren.Nested.Or.Left.Left}
+			for _, t := range term.Paren.Nested.Or.Left.Right {
+				ts = append(ts, t.Expr)
+			}
+
+			es = append(es, ts)
+
+			for _, rhs := range term.Paren.Nested.Or.Right {
+				ts := []EqualExpr{rhs.Expr.Left}
+				for _, t := range rhs.Expr.Right {
+					ts = append(ts, t.Expr)
+				}
+				es = append(es, ts)
+			}
+		} else {
+			es = append(es, []EqualExpr{term})
+		}
+
+		exprs = append(exprs, es)
 	}
+
+	// Calculate the cross product, this distributes the outer AND into the OR
+	product := [][]EqualExpr{{}}
+
+	for _, a := range exprs {
+		results := [][]EqualExpr{}
+		for _, r := range product {
+			for _, b := range a {
+				result := slices.Clone(r)
+				result = append(result, b...)
+				results = append(results, result)
+			}
+		}
+		product = results
+	}
+
+	conjunctions := []AndExpression{}
+	for _, p := range product {
+		var right []*AndRHS
+		for _, r := range p[1:] {
+			if right == nil {
+				right = []*AndRHS{}
+			}
+			right = append(right, &AndRHS{
+				Expr: r,
+			})
+		}
+		conjunctions = append(conjunctions, AndExpression{
+			Left:  p[0],
+			Right: right,
+		})
+	}
+
+	return conjunctions
 }
 
 func (e *AndExpression) invert() *OrExpression {
@@ -211,10 +286,14 @@ type AndRHS struct {
 	Expr EqualExpr `parser:"(And | 'AND' | 'and') @@"`
 }
 
-func (e *AndRHS) Normalise() *AndRHS {
-	return &AndRHS{
-		Expr: *e.Expr.Normalise(),
+func (e *AndRHS) Normalise() []EqualExpr {
+	terms := []EqualExpr{}
+
+	for _, expr := range e.Expr.Normalise() {
+		terms = append(terms, expr)
 	}
+
+	return terms
 }
 
 func (e *AndRHS) invert() *OrRHS {
@@ -227,7 +306,8 @@ func (e *AndRHS) invert() *OrRHS {
 
 // EqualExpr can be either an equality or a parenthesized expression.
 type EqualExpr struct {
-	Paren     *Paren     `parser:"  @@"`
+	Paren *Paren `parser:"  @@"`
+
 	Assign    *Equality  `parser:"| @@"`
 	Inclusion *Inclusion `parser:"| @@"`
 
@@ -238,48 +318,59 @@ type EqualExpr struct {
 	Glob               *Glob               `parser:"| @@"`
 }
 
-func (e *EqualExpr) Normalise() *EqualExpr {
+// Normalise on an EqualExpr can return multiple EqualExpr if the expression
+// was a Paren with only nested conjunctions that was simplified.
+func (e *EqualExpr) Normalise() []EqualExpr {
 
 	if e.Paren != nil {
-		p := e.Paren.Normalise()
+		normalised := e.Paren.Normalise()
 
-		// Remove parentheses that only contain a single nested expression
-		// (i.e. no OR or AND with multiple children)
-		if len(p.Nested.Or.Right) == 0 && len(p.Nested.Or.Left.Right) == 0 {
-			// This expression should already be properly normalised, we don't need to
-			// call Normalise again here
-			return &p.Nested.Or.Left.Left
+		// Remove parentheses that only contain a conjunction
+		// (i.e. the OR only has a single child)
+		if len(normalised.Nested.Or.Right) == 0 {
+			// The terms in the nested conjunction
+			right := normalised.Nested.Or.Left.Right
+			// The exprs to return
+			exprs := make([]EqualExpr, 0, 1+len(right))
+
+			exprs = append(exprs, normalised.Nested.Or.Left.Left)
+
+			for _, expr := range right {
+				exprs = append(exprs, expr.Expr)
+			}
+
+			return exprs
 		} else {
-			return &EqualExpr{Paren: p}
+			return []EqualExpr{{Paren: normalised}}
 		}
 	}
 
 	if e.LessThan != nil {
-		return &EqualExpr{LessThan: e.LessThan.Normalise()}
+		return []EqualExpr{{LessThan: e.LessThan.Normalise()}}
 	}
 
 	if e.LessOrEqualThan != nil {
-		return &EqualExpr{LessOrEqualThan: e.LessOrEqualThan.Normalise()}
+		return []EqualExpr{{LessOrEqualThan: e.LessOrEqualThan.Normalise()}}
 	}
 
 	if e.GreaterThan != nil {
-		return &EqualExpr{GreaterThan: e.GreaterThan.Normalise()}
+		return []EqualExpr{{GreaterThan: e.GreaterThan.Normalise()}}
 	}
 
 	if e.GreaterOrEqualThan != nil {
-		return &EqualExpr{GreaterOrEqualThan: e.GreaterOrEqualThan.Normalise()}
+		return []EqualExpr{{GreaterOrEqualThan: e.GreaterOrEqualThan.Normalise()}}
 	}
 
 	if e.Glob != nil {
-		return &EqualExpr{Glob: e.Glob.Normalise()}
+		return []EqualExpr{{Glob: e.Glob.Normalise()}}
 	}
 
 	if e.Assign != nil {
-		return &EqualExpr{Assign: e.Assign.Normalise()}
+		return []EqualExpr{{Assign: e.Assign.Normalise()}}
 	}
 
 	if e.Inclusion != nil {
-		return &EqualExpr{Inclusion: e.Inclusion.Normalise()}
+		return []EqualExpr{{Inclusion: e.Inclusion.Normalise()}}
 	}
 
 	panic("This should not happen!")

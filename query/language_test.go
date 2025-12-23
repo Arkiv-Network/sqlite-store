@@ -642,8 +642,11 @@ func TestParse(t *testing.T) {
 		)
 	})
 
+	// (n || n2) && (n3 && n5) || n4
+	// ( (n || n2) && n3 && n5 ) || n4
+	// ( n && n3 && n5 ) || ( n2 && n3 && n5 ) || n4
 	t.Run("parentheses", func(t *testing.T) {
-		v, err := Parse(`(name = 123 || name2 = "abc") && (name3 = "def") || name4 = 456`, log)
+		v, err := Parse(`(name = 123 || name2 = "abc") && (name3 = "def" && name5 = 5) || name4 = 456`, log)
 		require.NoError(t, err)
 
 		require.Equal(t,
@@ -652,36 +655,11 @@ func TestParse(t *testing.T) {
 					Or: OrExpression{
 						Left: AndExpression{
 							Left: EqualExpr{
-								Paren: &Paren{
-									Nested: Expression{
-										Or: OrExpression{
-											Left: AndExpression{
-												Left: EqualExpr{
-													Assign: &Equality{
-														Var:   "name",
-														IsNot: false,
-														Value: Value{
-															Number: pointerOf(uint64(123)),
-														},
-													},
-												},
-											},
-											Right: []*OrRHS{
-												{
-													Expr: AndExpression{
-														Left: EqualExpr{
-															Assign: &Equality{
-																Var:   "name2",
-																IsNot: false,
-																Value: Value{
-																	String: pointerOf("abc"),
-																},
-															},
-														},
-													},
-												},
-											},
-										},
+								Assign: &Equality{
+									Var:   "name",
+									IsNot: false,
+									Value: Value{
+										Number: pointerOf(uint64(123)),
 									},
 								},
 							},
@@ -697,9 +675,57 @@ func TestParse(t *testing.T) {
 										},
 									},
 								},
+								{
+									Expr: EqualExpr{
+										Assign: &Equality{
+											Var:   "name5",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(5)),
+											},
+										},
+									},
+								},
 							},
 						},
 						Right: []*OrRHS{
+							{
+								Expr: AndExpression{
+									Left: EqualExpr{
+										Assign: &Equality{
+											Var:   "name2",
+											IsNot: false,
+											Value: Value{
+												String: pointerOf("abc"),
+											},
+										},
+									},
+									Right: []*AndRHS{
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "name3",
+													IsNot: false,
+													Value: Value{
+														String: pointerOf("def"),
+													},
+												},
+											},
+										},
+										{
+											Expr: EqualExpr{
+												Assign: &Equality{
+													Var:   "name5",
+													IsNot: false,
+													Value: Value{
+														Number: pointerOf(uint64(5)),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
 							{
 								Expr: AndExpression{
 									Left: EqualExpr{
