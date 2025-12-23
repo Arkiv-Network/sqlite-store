@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Arkiv-Network/query-api/query"
 	sqlitestore "github.com/Arkiv-Network/sqlite-store"
+	"github.com/Arkiv-Network/sqlite-store/query"
 	"github.com/urfave/cli/v2"
 )
 
@@ -73,7 +73,7 @@ func main() {
 					Attributes:  true,
 				},
 				ResultsPerPage: 20,
-			}, "sqlite")
+			})
 			if err != nil {
 				return fmt.Errorf("failed to query entities: %w", err)
 			}
