@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang-migrate/migrate/v4"
@@ -20,10 +21,11 @@ import (
 
 	arkivevents "github.com/Arkiv-Network/arkiv-events"
 	"github.com/Arkiv-Network/arkiv-events/events"
-	query "github.com/Arkiv-Network/query-api/query"
-	"github.com/Arkiv-Network/query-api/sqlstore"
+	"github.com/Arkiv-Network/sqlite-store/query"
 	"github.com/Arkiv-Network/sqlite-store/store"
 )
+
+var ErrStopIteration = errors.New("stop iteration")
 
 type SQLiteStore struct {
 	writePool *sql.DB
@@ -614,23 +616,335 @@ func (s *SQLiteStore) FollowEvents(ctx context.Context, iterator arkivevents.Bat
 	return nil
 }
 
+func (s *SQLiteStore) GetLatestHead(ctx context.Context) (uint64, error) {
+	row := s.readPool.QueryRowContext(ctx, "SELECT block FROM last_block LIMIT 1")
+	var block *uint64
+	err := row.Scan(&block)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch latest head: %w", err)
+	}
+	return *block, nil
+}
+
+const cadence = 2 * time.Second
+
+func (s *SQLiteStore) EnsureBlockPresent(ctx context.Context, block uint64) error {
+
+	for {
+
+		latestHead, err := s.GetLatestHead(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest head: %w", err)
+		}
+
+		if block <= latestHead {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+			// wait 1/4 of the cadence - making sure we don't spin too fast but still not too slow
+		case <-time.After(cadence / 4):
+			// continue processing
+		}
+
+	}
+}
+
 func (s *SQLiteStore) QueryEntities(
 	ctx context.Context,
-	queryStr string,
-	options *query.Options,
-	sqlDialect string,
+	req string,
+	op *query.Options,
 ) (*query.QueryResponse, error) {
-	store := sqlstore.NewSQLStoreFromDB(s.readPool, s.log)
 
-	response, err := store.QueryEntities(
-		ctx,
-		queryStr,
-		options,
-		sqlDialect,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error calling query API: %w", err)
+	if op != nil {
+		s.log.Info("query options", "options", *op)
+		if op.IncludeData != nil {
+			s.log.Info("query options", "includeData", *op.IncludeData)
+		}
 	}
 
+	expr, err := query.Parse(req, s.log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse query: %w", err)
+	}
+
+	options, err := op.ToInternalQueryOptions()
+	if err != nil {
+		return nil, err
+	}
+	s.log.Info("internal query options", "options", *options)
+
+	latestHead, err := s.GetLatestHead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queryOptions, err := query.NewQueryOptions(s.log, latestHead, options)
+	if err != nil {
+		return nil, err
+	}
+
+	s.log.Info("final query options", "options", queryOptions)
+
+	evaluatedQuery, err := expr.Evaluate(queryOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	s.log.Info("evaluated query")
+
+	latestCursor := &query.Cursor{}
+	response := &query.QueryResponse{
+		BlockNumber: queryOptions.AtBlock,
+		Data:        make([]json.RawMessage, 0),
+	}
+
+	err = s.EnsureBlockPresent(ctx, queryOptions.AtBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	maxResultsPerPage := query.QueryResultCountLimit
+	if op != nil && op.ResultsPerPage > 0 && op.ResultsPerPage < query.QueryResultCountLimit {
+		maxResultsPerPage = op.ResultsPerPage
+	}
+	s.log.Info("query max results per page", "value", maxResultsPerPage)
+
+	needsCursor := false
+
+	err = s.QueryEntitiesInternalIterator(
+		ctx,
+		req,
+		evaluatedQuery,
+		queryOptions,
+		func(entity *query.EntityData, cursor *query.Cursor) error {
+
+			ed, err := json.Marshal(entity)
+			if err != nil {
+				return fmt.Errorf("failed to marshal entity: %w", err)
+			}
+
+			// We always add the last obtained result, and set the latest obtained cursor value
+			response.Data = append(response.Data, ed)
+			latestCursor = cursor
+
+			newLen := query.ResponseSize + len(ed) + 1
+			if newLen > query.MaxResponseSize || uint64(len(response.Data)) >= maxResultsPerPage {
+				needsCursor = true
+				return ErrStopIteration
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+
+	if needsCursor {
+		cursor, err := queryOptions.EncodeCursor(latestCursor)
+		if err != nil {
+			return nil, fmt.Errorf("could not encode cursor: %w", err)
+		}
+		response.Cursor = &cursor
+	}
+
+	s.log.Info("query number of results", "value", len(response.Data))
 	return response, nil
+}
+
+func (s *SQLiteStore) QueryEntitiesInternalIterator(
+	ctx context.Context,
+	originalQuery string,
+	evaluatedQuery *query.SelectQuery,
+	options *query.QueryOptions,
+	iterator func(*query.EntityData, *query.Cursor) error,
+) error {
+	s.log.Info(
+		"Executing query",
+		"query", originalQuery,
+		"sqlQuery", evaluatedQuery.Query,
+		"args", evaluatedQuery.Args,
+	)
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		s.log.Info("query execution time", "seconds", elapsed.Seconds(), "query", originalQuery)
+	}()
+
+	rows, err := s.readPool.QueryContext(ctx, evaluatedQuery.Query, evaluatedQuery.Args...)
+	if err != nil {
+		return fmt.Errorf("failed to get entities for query: %s: %w", originalQuery, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+
+		err := rows.Err()
+		if err != nil {
+			return fmt.Errorf("failed to get entities for query: %s: %w", originalQuery, err)
+		}
+
+		var (
+			key            *[]byte
+			payload        *[]byte
+			fromBlock      *uint64
+			owner          *string
+			contentType    *string
+			expiresAt      *uint64
+			createdAtBlock *uint64
+			sequence       *uint64
+			numericAttrs   *[]byte
+			stringAttrs    *[]byte
+		)
+		dest := []any{}
+		columns := map[string]any{}
+		for _, column := range options.Columns {
+			switch column.Name {
+			case "entity_key":
+				dest = append(dest, &key)
+				columns[column.Name] = &key
+			case "from_block":
+				dest = append(dest, &fromBlock)
+				columns[column.Name] = &fromBlock
+			case "payload":
+				dest = append(dest, &payload)
+				columns[column.Name] = &payload
+			case "owner":
+				dest = append(dest, &owner)
+				columns[column.Name] = &owner
+			case "content_type":
+				dest = append(dest, &contentType)
+				columns[column.Name] = &contentType
+			case "expires_at":
+				dest = append(dest, &expiresAt)
+				columns[column.Name] = &expiresAt
+			case "created_at_block":
+				dest = append(dest, &createdAtBlock)
+				columns[column.Name] = &createdAtBlock
+			case "sequence":
+				dest = append(dest, &sequence)
+				columns[column.Name] = &sequence
+			case "string_attributes":
+				dest = append(dest, &stringAttrs)
+				columns[column.Name] = &stringAttrs
+			case "numeric_attributes":
+				dest = append(dest, &numericAttrs)
+				columns[column.Name] = &numericAttrs
+			default:
+				var value any
+				dest = append(dest, &value)
+				columns[column.Name] = &value
+			}
+		}
+
+		if err := rows.Scan(dest...); err != nil {
+			return fmt.Errorf("failed to get entities for query: %s: %w", originalQuery, err)
+		}
+
+		var keyHash *common.Hash
+		if key != nil {
+			hash := common.BytesToHash(*key)
+			keyHash = &hash
+		}
+		var value []byte
+		if payload != nil {
+			value = *payload
+		}
+		var ownerAddress *common.Address
+		if owner != nil {
+			addr := common.HexToAddress(*owner)
+			ownerAddress = &addr
+		}
+
+		r := query.EntityData{
+			Value:       value,
+			ContentType: contentType,
+			Owner:       ownerAddress,
+			ExpiresAt:   expiresAt,
+		}
+
+		// We check whether the key was actually requested, since it's always included
+		// in the query because of sorting
+		if options.IncludeData.Key {
+			r.Key = keyHash
+		}
+
+		if options.IncludeData.LastModifiedAtBlock && sequence != nil {
+			// we need the upper 32 bits
+			val := *sequence >> 32
+			r.LastModifiedAtBlock = &val
+		}
+		if options.IncludeData.TransactionIndexInBlock && sequence != nil {
+			// we need bits 16 to 32, so we shift right by 16 and then mask with
+			// a bit string of 16 ones (subtract one from 2^17)
+			val := (*sequence >> 16) & ((1 << 16) - 1)
+			r.TransactionIndexInBlock = &val
+		}
+		if options.IncludeData.OperationIndexInTransaction && sequence != nil {
+			// get the lower 16 bits by applying the same bit mask
+			val := (*sequence) & ((1 << 16) - 1)
+			r.OperationIndexInTransaction = &val
+		}
+
+		if options.IncludeData.Attributes {
+			if stringAttrs != nil {
+				attrs := make(map[string]string)
+				err := json.Unmarshal(*stringAttrs, &attrs)
+				if err != nil {
+					return fmt.Errorf("error unmarshalling string attributes: %w", err)
+				}
+				r.StringAttributes = make([]query.StringAnnotation, 0, len(attrs))
+				for k, v := range attrs {
+					if options.IncludeData.SyntheticAttributes || !strings.HasPrefix(k, "$") {
+						r.StringAttributes = append(r.StringAttributes, query.StringAnnotation{
+							Key:   k,
+							Value: v,
+						})
+					}
+				}
+			}
+			if numericAttrs != nil {
+				attrs := make(map[string]uint64)
+				err := json.Unmarshal(*numericAttrs, &attrs)
+				if err != nil {
+					return fmt.Errorf("error unmarshalling string attributes: %w", err)
+				}
+				r.NumericAttributes = make([]query.NumericAnnotation, 0, len(attrs))
+				for k, v := range attrs {
+					if options.IncludeData.SyntheticAttributes || !strings.HasPrefix(k, "$") {
+						r.NumericAttributes = append(r.NumericAttributes, query.NumericAnnotation{
+							Key:   k,
+							Value: v,
+						})
+					}
+				}
+			}
+		}
+
+		cursor := query.Cursor{
+			BlockNumber:  options.AtBlock,
+			ColumnValues: make([]query.CursorValue, 0, len(options.OrderBy)),
+		}
+
+		for _, o := range options.OrderBy {
+			cursor.ColumnValues = append(cursor.ColumnValues, query.CursorValue{
+				ColumnName: o.Column.Name,
+				Value:      columns[o.Column.Name],
+				Descending: o.Descending,
+			})
+		}
+
+		err = iterator(&r, &cursor)
+		if errors.Is(err, ErrStopIteration) {
+			break
+		} else if err != nil {
+			return fmt.Errorf("error during query execution: %w", err)
+		}
+	}
+
+	return nil
 }
