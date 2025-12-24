@@ -156,18 +156,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 
 func (e *Expression) Evaluate(builder *QueryBuilder) string {
 	builder.queryBuilder.WriteString("WITH ")
-	prevTable := e.Or.Evaluate(builder)
-
-	builder.writeComma()
-	nextTable := builder.nextTableName()
-
-	builder.queryBuilder.WriteString(nextTable)
-	builder.queryBuilder.WriteString(" AS (")
-	builder.queryBuilder.WriteString("SELECT DISTINCT * FROM ")
-	builder.queryBuilder.WriteString(prevTable)
-	builder.queryBuilder.WriteString(")")
-
-	return nextTable
+	return e.Or.Evaluate(builder)
 }
 
 func (e *OrExpression) Evaluate(b *QueryBuilder) string {
