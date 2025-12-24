@@ -65,6 +65,7 @@ func NewSQLiteStore(
 	readPool.SetConnMaxIdleTime(0)
 
 	err = runMigrations(writePool)
+	log.Info("running migrations")
 	if err != nil {
 		writePool.Close()
 		readPool.Close()
@@ -690,7 +691,7 @@ func (s *SQLiteStore) QueryEntities(
 
 	s.log.Info("final query options", "options", queryOptions)
 
-	evaluatedQuery, err := expr.Evaluate(queryOptions)
+	evaluatedQuery, err := expr.EvaluateExists(queryOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +777,7 @@ func (s *SQLiteStore) QueryEntitiesInternalIterator(
 		elapsed := time.Since(startTime)
 		s.log.Info("query execution time", "seconds", elapsed.Seconds(), "query", originalQuery)
 
-		if elapsed.Seconds() > 1 {
+		if elapsed.Seconds() > 0 {
 			rows, err := s.readPool.QueryContext(
 				ctx,
 				fmt.Sprintf("explain query plan %s", evaluatedQuery.Query),
