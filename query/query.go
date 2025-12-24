@@ -29,7 +29,7 @@ func (b *QueryBuilder) nextTableName() string {
 func (b *QueryBuilder) pushArgument(arg any) string {
 	b.args = append(b.args, arg)
 	b.argsCount += 1
-	return fmt.Sprintf("$%d", b.argsCount)
+	return fmt.Sprintf("?%d", b.argsCount)
 }
 
 func (b *QueryBuilder) writeComma() {
