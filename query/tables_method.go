@@ -300,9 +300,9 @@ func (e *Glob) Evaluate(b *QueryBuilder) string {
 	varArg := b.pushArgument(e.Var)
 	valArg := b.pushArgument(e.Value)
 
-	op := "~"
+	op := "GLOB"
 	if e.IsNot {
-		op = "!~"
+		op = "NOT GLOB"
 	}
 
 	return b.createAnnotationQuery(
