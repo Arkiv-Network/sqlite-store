@@ -36,7 +36,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 				builder.options.columnString(),
 				"FROM",
 				t.Expression.Evaluate(&builder),
-				"AS keys INNER JOIN payloads AS e ON keys.entity_key = e.entity_key AND keys.from_block = e.from_block",
+				"AS keys INNER JOIN payloads AS e INDEXED BY payloads_entity_key_index ON keys.entity_key = e.entity_key AND keys.from_block = e.from_block",
 			},
 			" ",
 		))
@@ -54,7 +54,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 	if builder.options.IncludeData != nil {
 		if builder.options.IncludeData.Owner {
 			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN string_attributes AS ownerAttrs"+
+				" INNER JOIN string_attributes AS ownerAttrs INDEXED BY string_attributes_entity_kv_idx"+
 					" ON e.entity_key = ownerAttrs.entity_key"+
 					" AND e.from_block = ownerAttrs.from_block"+
 					" AND ownerAttrs.key = '%s'",
@@ -63,7 +63,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 		}
 		if builder.options.IncludeData.Expiration {
 			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS expirationAttrs"+
+				" INNER JOIN numeric_attributes AS expirationAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
 					" ON e.entity_key = expirationAttrs.entity_key"+
 					" AND e.from_block = expirationAttrs.from_block"+
 					" AND expirationAttrs.key = '%s'",
@@ -72,7 +72,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 		}
 		if builder.options.IncludeData.CreatedAtBlock {
 			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS createdAtBlockAttrs"+
+				" INNER JOIN numeric_attributes AS createdAtBlockAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
 					" ON e.entity_key = createdAtBlockAttrs.entity_key"+
 					" AND e.from_block = createdAtBlockAttrs.from_block"+
 					" AND createdAtBlockAttrs.key = '%s'",
@@ -83,7 +83,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 			options.IncludeData.TransactionIndexInBlock ||
 			options.IncludeData.OperationIndexInTransaction {
 			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS sequenceAttrs"+
+				" INNER JOIN numeric_attributes AS sequenceAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
 					" ON e.entity_key = sequenceAttrs.entity_key"+
 					" AND e.from_block = sequenceAttrs.from_block"+
 					" AND sequenceAttrs.key = '%s'",
