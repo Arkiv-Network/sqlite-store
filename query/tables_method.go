@@ -307,7 +307,7 @@ func (e *Glob) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		"string",
-		fmt.Sprintf("key = %s AND value %s %s", varArg, op, valArg),
+		fmt.Sprintf("a.key = %s AND a.value %s %s", varArg, op, valArg),
 	)
 }
 
@@ -325,7 +325,7 @@ func (e *LessThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value < %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value < %s", varArg, valArg),
 	)
 }
 
@@ -343,7 +343,7 @@ func (e *LessOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value <= %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value <= %s", varArg, valArg),
 	)
 }
 
@@ -361,7 +361,7 @@ func (e *GreaterThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value > %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value > %s", varArg, valArg),
 	)
 }
 
@@ -379,7 +379,7 @@ func (e *GreaterOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value >= %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value >= %s", varArg, valArg),
 	)
 }
 
@@ -402,7 +402,7 @@ func (e *Equality) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value %s %s", varArg, op, valArg),
+		fmt.Sprintf("a.key = %s AND a.value %s %s", varArg, op, valArg),
 	)
 }
 
