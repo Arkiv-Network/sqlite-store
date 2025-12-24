@@ -424,8 +424,7 @@ func (e *Inclusion) Evaluate(b *QueryBuilder) string {
 
 	} else {
 		attrType = "numeric"
-		values = make([]string, 0, len(e.Values.Numbers)+1)
-		values = append(values, e.Var)
+		values = make([]string, 0, len(e.Values.Numbers))
 		for _, value := range e.Values.Numbers {
 			values = append(values, b.pushArgument(value))
 		}
