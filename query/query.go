@@ -2,7 +2,6 @@ package query
 
 import (
 	"fmt"
-	"hash/fnv"
 	"strings"
 )
 
@@ -22,13 +21,6 @@ type QueryBuilder struct {
 	sqlDialect   string
 }
 
-func attributeTableAlias(name string) string {
-	h := fnv.New32a()
-	h.Write([]byte(name))
-
-	return fmt.Sprintf("arkiv_attr_%d", h.Sum32())
-}
-
 func (b *QueryBuilder) nextTableName() string {
 	b.tableCounter = b.tableCounter + 1
 	return fmt.Sprintf("table_%d", b.tableCounter)
@@ -37,7 +29,7 @@ func (b *QueryBuilder) nextTableName() string {
 func (b *QueryBuilder) pushArgument(arg any) string {
 	b.args = append(b.args, arg)
 	b.argsCount += 1
-	return fmt.Sprintf("$%d", b.argsCount)
+	return fmt.Sprintf("?%d", b.argsCount)
 }
 
 func (b *QueryBuilder) writeComma() {

@@ -7,6 +7,7 @@ import (
 
 func (b *QueryBuilder) createLeafQuery(query string) string {
 	tableName := b.nextTableName()
+
 	b.writeComma()
 	b.queryBuilder.WriteString(tableName)
 	b.queryBuilder.WriteString(" AS (")
@@ -131,7 +132,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 	}
 
 	blockArg := builder.pushArgument(builder.options.AtBlock)
-	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block", blockArg)
+	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
 	builder.queryBuilder.WriteString(" ORDER BY ")
 
@@ -155,18 +156,7 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 
 func (e *Expression) Evaluate(builder *QueryBuilder) string {
 	builder.queryBuilder.WriteString("WITH ")
-	prevTable := e.Or.Evaluate(builder)
-
-	builder.writeComma()
-	nextTable := builder.nextTableName()
-
-	builder.queryBuilder.WriteString(nextTable)
-	builder.queryBuilder.WriteString(" AS (")
-	builder.queryBuilder.WriteString("SELECT DISTINCT * FROM ")
-	builder.queryBuilder.WriteString(prevTable)
-	builder.queryBuilder.WriteString(")")
-
-	return nextTable
+	return e.Or.Evaluate(builder)
 }
 
 func (e *OrExpression) Evaluate(b *QueryBuilder) string {
@@ -310,14 +300,14 @@ func (e *Glob) Evaluate(b *QueryBuilder) string {
 	varArg := b.pushArgument(e.Var)
 	valArg := b.pushArgument(e.Value)
 
-	op := "~"
+	op := "GLOB"
 	if e.IsNot {
-		op = "!~"
+		op = "NOT GLOB"
 	}
 
 	return b.createAnnotationQuery(
 		"string",
-		fmt.Sprintf("key = %s AND value %s %s", varArg, op, valArg),
+		fmt.Sprintf("a.key = %s AND a.value %s %s", varArg, op, valArg),
 	)
 }
 
@@ -335,7 +325,7 @@ func (e *LessThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value < %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value < %s", varArg, valArg),
 	)
 }
 
@@ -353,7 +343,7 @@ func (e *LessOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value <= %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value <= %s", varArg, valArg),
 	)
 }
 
@@ -371,7 +361,7 @@ func (e *GreaterThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value > %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value > %s", varArg, valArg),
 	)
 }
 
@@ -389,7 +379,7 @@ func (e *GreaterOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value >= %s", varArg, valArg),
+		fmt.Sprintf("a.key = %s AND a.value >= %s", varArg, valArg),
 	)
 }
 
@@ -412,7 +402,7 @@ func (e *Equality) Evaluate(b *QueryBuilder) string {
 
 	return b.createAnnotationQuery(
 		attrType,
-		fmt.Sprintf("key = %s AND value %s %s", varArg, op, valArg),
+		fmt.Sprintf("a.key = %s AND a.value %s %s", varArg, op, valArg),
 	)
 }
 
@@ -434,8 +424,7 @@ func (e *Inclusion) Evaluate(b *QueryBuilder) string {
 
 	} else {
 		attrType = "numeric"
-		values = make([]string, 0, len(e.Values.Numbers)+1)
-		values = append(values, e.Var)
+		values = make([]string, 0, len(e.Values.Numbers))
 		for _, value := range e.Values.Numbers {
 			values = append(values, b.pushArgument(value))
 		}

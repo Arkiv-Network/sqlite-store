@@ -39,6 +39,8 @@ func NewSQLiteStore(
 	numberOfReadThreads int,
 ) (*SQLiteStore, error) {
 
+	log.Info("Creating SQLiteStore", "dbpath", dbPath)
+
 	err := os.MkdirAll(filepath.Dir(dbPath), 0755)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)

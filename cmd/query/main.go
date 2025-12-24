@@ -18,24 +18,15 @@ import (
 
 func main() {
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			switch a.Key {
-			case "sqlQuery", "args", "executionTime", "msg":
-				return a
-			default:
-				return slog.Attr{}
-			}
-		},
-	}))
+	logger := slog.New(slog.Default().Handler())
 
 	cfg := struct {
 		dbPath string
 	}{}
 
 	app := &cli.App{
-		Name:  "load-from-node",
-		Usage: "Load data from a node into a SQLite database",
+		Name:  "query",
+		Usage: "Query the Arkiv database",
 		Flags: []cli.Flag{
 			&cli.PathFlag{
 				Name:        "db-path",
