@@ -281,15 +281,12 @@ func (b *QueryBuilder) createAnnotationQuery(
 	return b.createLeafQuery(
 		strings.Join(
 			[]string{
-				"SELECT e.entity_key, e.from_block FROM",
+				"SELECT a.entity_key, a.from_block FROM",
 				tableName,
 				"AS a",
-				"INNER JOIN payloads AS e",
-				"ON a.entity_key = e.entity_key",
-				"AND a.from_block = e.from_block",
-				fmt.Sprintf("AND %s BETWEEN e.from_block AND e.to_block - 1", blockArg),
 				"WHERE",
 				whereClause,
+				fmt.Sprintf("AND %s BETWEEN a.from_block AND a.to_block - 1", blockArg),
 			},
 			" ",
 		),
