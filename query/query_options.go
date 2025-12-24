@@ -62,15 +62,17 @@ func NewQueryOptions(log *slog.Logger, latestHead uint64, options *InternalQuery
 	queryOptions.Columns = []Column{}
 
 	// We always need the primary key of the payloads table because of sorting
-	queryOptions.Columns = append(queryOptions.Columns, Column{
-		Name:          "from_block",
-		QualifiedName: "e.from_block",
-	})
-	queryOptions.Columns = append(queryOptions.Columns, Column{
-		Name:          "entity_key",
-		QualifiedName: "e.entity_key",
-		IsBytes:       true,
-	})
+	queryOptions.Columns = append(queryOptions.Columns,
+		Column{
+			Name:          "from_block",
+			QualifiedName: "e.from_block",
+		},
+		Column{
+			Name:          "entity_key",
+			QualifiedName: "e.entity_key",
+			IsBytes:       true,
+		},
+	)
 
 	if options.IncludeData.Payload {
 		queryOptions.Columns = append(queryOptions.Columns, Column{
@@ -144,19 +146,21 @@ func NewQueryOptions(log *slog.Logger, latestHead uint64, options *InternalQuery
 			Descending: o.Descending,
 		})
 	}
-	queryOptions.OrderBy = append(queryOptions.OrderBy, OrderBy{
-		Column: Column{
-			Name:          "from_block",
-			QualifiedName: "e.from_block",
+	queryOptions.OrderBy = append(queryOptions.OrderBy,
+		OrderBy{
+			Column: Column{
+				Name:          "from_block",
+				QualifiedName: "e.from_block",
+			},
 		},
-	})
-	queryOptions.OrderBy = append(queryOptions.OrderBy, OrderBy{
-		Column: Column{
-			Name:          "entity_key",
-			QualifiedName: "e.entity_key",
-			IsBytes:       true,
+		OrderBy{
+			Column: Column{
+				Name:          "entity_key",
+				QualifiedName: "e.entity_key",
+				IsBytes:       true,
+			},
 		},
-	})
+	)
 
 	queryOptions.AtBlock = latestHead
 
