@@ -775,6 +775,41 @@ func (s *SQLiteStore) QueryEntitiesInternalIterator(
 	defer func() {
 		elapsed := time.Since(startTime)
 		s.log.Info("query execution time", "seconds", elapsed.Seconds(), "query", originalQuery)
+
+		if elapsed.Seconds() > 1 {
+			rows, err := s.readPool.QueryContext(
+				ctx,
+				fmt.Sprintf("explain query plan %s", evaluatedQuery.Query),
+				evaluatedQuery.Args...,
+			)
+			if err != nil {
+				s.log.Error("failed to get query plan", "err", err)
+			}
+
+			defer rows.Close()
+
+			var (
+				id      int
+				parent  int
+				notUsed int
+				detail  string
+			)
+
+			b := strings.Builder{}
+			for rows.Next() {
+				err := rows.Err()
+				if err != nil {
+					s.log.Error("failed to get query plan", "err", err)
+				}
+
+				err = rows.Scan(&id, &parent, &notUsed, &detail)
+				if err != nil {
+					s.log.Error("failed to get query plan", "err", err)
+				}
+				fmt.Fprintf(&b, "id=%d parent=%d %s\n", id, parent, detail)
+			}
+			s.log.Info("query plan", "plan", b.String())
+		}
 	}()
 
 	rows, err := s.readPool.QueryContext(ctx, evaluatedQuery.Query, evaluatedQuery.Args...)
