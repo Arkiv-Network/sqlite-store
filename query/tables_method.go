@@ -18,13 +18,10 @@ func (b *QueryBuilder) createLeafQuery(query string) string {
 }
 
 func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
-	tableBuilder := strings.Builder{}
-	args := []any{}
-
 	builder := QueryBuilder{
 		options:      *options,
-		queryBuilder: &tableBuilder,
-		args:         args,
+		queryBuilder: &strings.Builder{},
+		args:         []any{},
 		needsComma:   false,
 		needsWhere:   true,
 	}
