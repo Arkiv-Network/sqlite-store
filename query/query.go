@@ -2,7 +2,6 @@ package query
 
 import (
 	"fmt"
-	"hash/fnv"
 	"strings"
 )
 
@@ -20,13 +19,6 @@ type QueryBuilder struct {
 	needsWhere   bool
 	options      QueryOptions
 	sqlDialect   string
-}
-
-func attributeTableAlias(name string) string {
-	h := fnv.New32a()
-	h.Write([]byte(name))
-
-	return fmt.Sprintf("arkiv_attr_%d", h.Sum32())
 }
 
 func (b *QueryBuilder) nextTableName() string {
