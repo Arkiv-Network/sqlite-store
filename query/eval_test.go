@@ -16,16 +16,16 @@ func TestEqualExpr(t *testing.T) {
 	expr, err := Parse("name = \"test\"", log)
 	require.NoError(t, err)
 
-	res, err := expr.Evaluate(queryOptions)
+	res, err := expr.EvaluateExists(queryOptions)
 	require.NoError(t, err)
 
 	block := uint64(0)
 
 	require.ElementsMatch(t,
 		[]any{
+			block,
 			"name",
 			"test",
-			block, block,
 		},
 		res.Args,
 	)
@@ -34,14 +34,14 @@ func TestEqualExpr(t *testing.T) {
 	expr, err = Parse("déçevant = \"non\"", log)
 	require.NoError(t, err)
 
-	res, err = expr.Evaluate(queryOptions)
+	res, err = expr.EvaluateExists(queryOptions)
 	require.NoError(t, err)
 
 	require.ElementsMatch(t,
 		[]any{
+			block,
 			"déçevant",
 			"non",
-			block, block,
 		},
 		res.Args,
 	)
@@ -49,14 +49,14 @@ func TestEqualExpr(t *testing.T) {
 	expr, err = Parse("بروح = \"ايوة\"", log)
 	require.NoError(t, err)
 
-	res, err = expr.Evaluate(queryOptions)
+	res, err = expr.EvaluateExists(queryOptions)
 	require.NoError(t, err)
 
 	require.ElementsMatch(t,
 		[]any{
+			block,
 			"بروح",
 			"ايوة",
-			block, block,
 		},
 		res.Args,
 	)
@@ -70,28 +70,28 @@ func TestNumericEqualExpr(t *testing.T) {
 	expr, err := Parse("age = 123", log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestAndExpr(t *testing.T) {
 	expr, err := Parse(`age = 123 && name = "abc"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestOrExpr(t *testing.T) {
 	expr, err := Parse(`age = 123 || name = "abc"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestParenthesesExpr(t *testing.T) {
 	expr, err := Parse(`(name = 123 || name2 = "abc") && name3 = "def" || (name4 = 456 && name5 = 567)`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestOwner(t *testing.T) {
@@ -100,14 +100,14 @@ func TestOwner(t *testing.T) {
 	expr, err := Parse(fmt.Sprintf(`(age = 123 || name = "abc") && $owner = %s`, owner), log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestGlob(t *testing.T) {
 	expr, err := Parse(`age ~ "abc"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestNegation(t *testing.T) {
@@ -118,35 +118,35 @@ func TestNegation(t *testing.T) {
 
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestAndExpr_MultipleTerms(t *testing.T) {
 	expr, err := Parse(`a = 1 && b = "x" && c = 2 && d = "y"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestOrExpr_MultipleTerms(t *testing.T) {
 	expr, err := Parse(`a = 1 || b = "x" || c = 2 || d = "y"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestMixedAndOr_NoParens(t *testing.T) {
 	expr, err := Parse(`a = 1 && b = "x" || c = 2 && d = "y"`, log)
 	require.NoError(t, err)
 
-	expr.Evaluate(queryOptions)
+	expr.EvaluateExists(queryOptions)
 }
 
 func TestSorting(t *testing.T) {
 	expr, err := Parse(`a = 1`, log)
 	require.NoError(t, err)
 
-	_, err = expr.Evaluate(&QueryOptions{
+	_, err = expr.EvaluateExists(&QueryOptions{
 		OrderByAnnotations: []OrderByAnnotation{
 			{
 				Name: "foo",

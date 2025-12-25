@@ -17,6 +17,7 @@ func (b *QueryBuilder) createLeafQuery(query string) string {
 	return tableName
 }
 
+// TODO implement this on the AST instead
 func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 	builder := QueryBuilder{
 		options:      *options,
