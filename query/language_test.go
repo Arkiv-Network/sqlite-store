@@ -19,16 +19,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: false,
-									Value: Value{
-										String: pointerOf("test\"2"),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: false,
+											Value: Value{
+												String: pointerOf("test\"2"),
+											},
+										},
 									},
 								},
 							},
@@ -51,8 +55,8 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: nil,
+			&AST{
+				Expr: nil,
 			},
 			v,
 		)
@@ -64,16 +68,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: false,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -91,22 +99,22 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: true,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: true,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
-								},
-							},
-							Right: []*AndRHS{
-								{
-									EqualExpr{
+									{
 										Assign: &Equality{
 											Var:   "name",
 											IsNot: true,
@@ -131,16 +139,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: true,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: true,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -158,16 +170,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: true,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: true,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -185,15 +201,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								LessThan: &LessThan{
-									Var: "name",
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										LessThan: &LessThan{
+											Var: "name",
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -209,15 +229,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								LessThan: &LessThan{
-									Var: "name",
-									Value: Value{
-										String: pointerOf("123"),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										LessThan: &LessThan{
+											Var: "name",
+											Value: Value{
+												String: pointerOf("123"),
+											},
+										},
 									},
 								},
 							},
@@ -233,15 +257,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								GreaterOrEqualThan: &GreaterOrEqualThan{
-									Var: "name",
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										GreaterOrEqualThan: &GreaterOrEqualThan{
+											Var: "name",
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -259,15 +287,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								LessOrEqualThan: &LessOrEqualThan{
-									Var: "name",
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										LessOrEqualThan: &LessOrEqualThan{
+											Var: "name",
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -283,15 +315,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								LessOrEqualThan: &LessOrEqualThan{
-									Var: "name",
-									Value: Value{
-										String: pointerOf("123"),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										LessOrEqualThan: &LessOrEqualThan{
+											Var: "name",
+											Value: Value{
+												String: pointerOf("123"),
+											},
+										},
 									},
 								},
 							},
@@ -309,15 +345,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								GreaterThan: &GreaterThan{
-									Var: "name",
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										GreaterThan: &GreaterThan{
+											Var: "name",
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -333,15 +373,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								GreaterThan: &GreaterThan{
-									Var: "name",
-									Value: Value{
-										String: pointerOf("123"),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										GreaterThan: &GreaterThan{
+											Var: "name",
+											Value: Value{
+												String: pointerOf("123"),
+											},
+										},
 									},
 								},
 							},
@@ -359,15 +403,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								GreaterOrEqualThan: &GreaterOrEqualThan{
-									Var: "name",
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										GreaterOrEqualThan: &GreaterOrEqualThan{
+											Var: "name",
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
@@ -383,15 +431,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								GreaterOrEqualThan: &GreaterOrEqualThan{
-									Var: "name",
-									Value: Value{
-										String: pointerOf("123"),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										GreaterOrEqualThan: &GreaterOrEqualThan{
+											Var: "name",
+											Value: Value{
+												String: pointerOf("123"),
+											},
+										},
 									},
 								},
 							},
@@ -409,15 +461,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Glob: &Glob{
-									Var:   "name",
-									IsNot: false,
-									Value: "foo",
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Glob: &Glob{
+											Var:   "name",
+											IsNot: false,
+											Value: "foo",
+										},
+									},
 								},
 							},
 						},
@@ -435,16 +491,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "$owner",
-									IsNot: false,
-									Value: Value{
-										String: &owner,
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "$owner",
+											IsNot: false,
+											Value: Value{
+												String: &owner,
+											},
+										},
 									},
 								},
 							},
@@ -463,16 +523,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "$owner",
-									IsNot: false,
-									Value: Value{
-										String: &owner,
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "$owner",
+											IsNot: false,
+											Value: Value{
+												String: &owner,
+											},
+										},
 									},
 								},
 							},
@@ -491,16 +555,20 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "$owner",
-									IsNot: true,
-									Value: Value{
-										String: &owner,
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "$owner",
+											IsNot: true,
+											Value: Value{
+												String: &owner,
+											},
+										},
 									},
 								},
 							},
@@ -518,15 +586,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Glob: &Glob{
-									Var:   "name",
-									IsNot: false,
-									Value: "foo",
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Glob: &Glob{
+											Var:   "name",
+											IsNot: false,
+											Value: "foo",
+										},
+									},
 								},
 							},
 						},
@@ -543,15 +615,19 @@ func TestParse(t *testing.T) {
 
 		require.Equal(
 			t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Glob: &Glob{
-									Var:   "name",
-									IsNot: true,
-									Value: "foo",
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Glob: &Glob{
+											Var:   "name",
+											IsNot: true,
+											Value: "foo",
+										},
+									},
 								},
 							},
 						},
@@ -567,22 +643,22 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: false,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
-								},
-							},
-							Right: []*AndRHS{
-								{
-									Expr: EqualExpr{
+									{
 										Assign: &Equality{
 											Var:   "name2",
 											IsNot: false,
@@ -606,24 +682,26 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: false,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
 								},
 							},
-						},
-						Right: []*OrRHS{
 							{
-								Expr: AndExpression{
-									Left: EqualExpr{
+								Terms: []ASTTerm{
+									{
 										Assign: &Equality{
 											Var:   "name2",
 											IsNot: false,
@@ -651,24 +729,26 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "n1",
-									IsNot: false,
-									Value: Value{
-										Number: pointerOf(uint64(1)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "n1",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(1)),
+											},
+										},
 									},
 								},
 							},
-						},
-						Right: []*OrRHS{
 							{
-								Expr: AndExpression{
-									Left: EqualExpr{
+								Terms: []ASTTerm{
+									{
 										Assign: &Equality{
 											Var:   "n2",
 											IsNot: false,
@@ -677,35 +757,29 @@ func TestParse(t *testing.T) {
 											},
 										},
 									},
-									Right: []*AndRHS{
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "n3",
-													IsNot: false,
-													Value: Value{
-														Number: pointerOf(uint64(3)),
-													},
-												},
+									{
+										Assign: &Equality{
+											Var:   "n3",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(3)),
 											},
 										},
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "n5",
-													IsNot: false,
-													Value: Value{
-														Number: pointerOf(uint64(5)),
-													},
-												},
+									},
+									{
+										Assign: &Equality{
+											Var:   "n5",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(5)),
 											},
 										},
 									},
 								},
 							},
 							{
-								Expr: AndExpression{
-									Left: EqualExpr{
+								Terms: []ASTTerm{
+									{
 										Assign: &Equality{
 											Var:   "n2",
 											IsNot: false,
@@ -714,27 +788,21 @@ func TestParse(t *testing.T) {
 											},
 										},
 									},
-									Right: []*AndRHS{
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "n3",
-													IsNot: false,
-													Value: Value{
-														Number: pointerOf(uint64(3)),
-													},
-												},
+									{
+										Assign: &Equality{
+											Var:   "n3",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(3)),
 											},
 										},
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "n4",
-													IsNot: false,
-													Value: Value{
-														Number: pointerOf(uint64(4)),
-													},
-												},
+									},
+									{
+										Assign: &Equality{
+											Var:   "n4",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(4)),
 											},
 										},
 									},
@@ -756,22 +824,22 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t,
-			&TopLevel{
-				Expression: &Expression{
-					Or: OrExpression{
-						Left: AndExpression{
-							Left: EqualExpr{
-								Assign: &Equality{
-									Var:   "name",
-									IsNot: false,
-									Value: Value{
-										Number: pointerOf(uint64(123)),
+			&AST{
+				Expr: &ASTExpr{
+					Or: ASTOr{
+						Terms: []ASTAnd{
+							{
+								Terms: []ASTTerm{
+									{
+										Assign: &Equality{
+											Var:   "name",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(123)),
+											},
+										},
 									},
-								},
-							},
-							Right: []*AndRHS{
-								{
-									Expr: EqualExpr{
+									{
 										Assign: &Equality{
 											Var:   "name3",
 											IsNot: false,
@@ -780,9 +848,7 @@ func TestParse(t *testing.T) {
 											},
 										},
 									},
-								},
-								{
-									Expr: EqualExpr{
+									{
 										Assign: &Equality{
 											Var:   "name5",
 											IsNot: false,
@@ -793,11 +859,9 @@ func TestParse(t *testing.T) {
 									},
 								},
 							},
-						},
-						Right: []*OrRHS{
 							{
-								Expr: AndExpression{
-									Left: EqualExpr{
+								Terms: []ASTTerm{
+									{
 										Assign: &Equality{
 											Var:   "name2",
 											IsNot: false,
@@ -806,35 +870,29 @@ func TestParse(t *testing.T) {
 											},
 										},
 									},
-									Right: []*AndRHS{
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "name3",
-													IsNot: false,
-													Value: Value{
-														String: pointerOf("def"),
-													},
-												},
+									{
+										Assign: &Equality{
+											Var:   "name3",
+											IsNot: false,
+											Value: Value{
+												String: pointerOf("def"),
 											},
 										},
-										{
-											Expr: EqualExpr{
-												Assign: &Equality{
-													Var:   "name5",
-													IsNot: false,
-													Value: Value{
-														Number: pointerOf(uint64(5)),
-													},
-												},
+									},
+									{
+										Assign: &Equality{
+											Var:   "name5",
+											IsNot: false,
+											Value: Value{
+												Number: pointerOf(uint64(5)),
 											},
 										},
 									},
 								},
 							},
 							{
-								Expr: AndExpression{
-									Left: EqualExpr{
+								Terms: []ASTTerm{
+									{
 										Assign: &Equality{
 											Var:   "name4",
 											IsNot: false,

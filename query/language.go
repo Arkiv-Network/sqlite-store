@@ -42,17 +42,39 @@ var lex = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Star", Pattern: `\*`},
 })
 
+type AST struct {
+	Expr *ASTExpr
+}
+type ASTExpr struct {
+	Or ASTOr
+}
+type ASTOr struct {
+	Terms []ASTAnd
+}
+type ASTAnd struct {
+	Terms []ASTTerm
+}
+type ASTTerm struct {
+	Assign             *Equality
+	Inclusion          *Inclusion
+	LessThan           *LessThan
+	LessOrEqualThan    *LessOrEqualThan
+	GreaterThan        *GreaterThan
+	GreaterOrEqualThan *GreaterOrEqualThan
+	Glob               *Glob
+}
+
 type TopLevel struct {
 	Expression *Expression `parser:"@@ | All | Star"`
 }
 
-func (t *TopLevel) Normalise() *TopLevel {
+func (t *TopLevel) Normalise() *AST {
 	if t.Expression != nil {
-		return &TopLevel{
-			Expression: t.Expression.Normalise(),
+		return &AST{
+			Expr: t.Expression.Normalise(),
 		}
 	}
-	return t
+	return &AST{}
 }
 
 // Expression is the top-level rule.
@@ -60,17 +82,9 @@ type Expression struct {
 	Or OrExpression `parser:"@@"`
 }
 
-func (e *Expression) Normalise() *Expression {
+func (e *Expression) Normalise() *ASTExpr {
 	normalised := e.Or.Normalise()
-	// Remove unneeded OR+AND nodes that both only contain a single child
-	// when that child is a parenthesised expression
-	if len(normalised.Right) == 0 && len(normalised.Left.Right) == 0 && normalised.Left.Left.Paren != nil {
-		// This has already been normalised by the call above, so any negation has
-		// been pushed into the leaf expressions and we can safely strip away the
-		// parentheses
-		return &normalised.Left.Left.Paren.Nested
-	}
-	return &Expression{
+	return &ASTExpr{
 		Or: *normalised,
 	}
 }
@@ -100,26 +114,14 @@ type OrExpression struct {
 	Right []*OrRHS      `parser:"@@*"`
 }
 
-func (e *OrExpression) Normalise() *OrExpression {
-	var newRight []*OrRHS = nil
-
-	exprs := e.Left.Normalise()
+func (e *OrExpression) Normalise() *ASTOr {
+	terms := e.Left.Normalise()
 	for _, rhs := range e.Right {
-		exprs = append(exprs, rhs.Normalise()...)
+		terms = append(terms, rhs.Normalise()...)
 	}
 
-	for _, rhs := range exprs[1:] {
-		if newRight == nil {
-			newRight = []*OrRHS{}
-		}
-		newRight = append(newRight, &OrRHS{
-			Expr: rhs,
-		})
-	}
-
-	return &OrExpression{
-		Left:  exprs[0],
-		Right: newRight,
+	return &ASTOr{
+		Terms: terms,
 	}
 }
 
@@ -153,7 +155,7 @@ type OrRHS struct {
 	Expr AndExpression `parser:"(Or | 'OR' | 'or') @@"`
 }
 
-func (e *OrRHS) Normalise() []AndExpression {
+func (e *OrRHS) Normalise() []ASTAnd {
 	return e.Expr.Normalise()
 }
 
@@ -176,89 +178,60 @@ type AndExpression struct {
 	Right []*AndRHS `parser:"@@*"`
 }
 
-func (e *AndExpression) Normalise() []AndExpression {
+func (e *EqualExpr) convertToTerms() [][]ASTTerm {
+	// First level is OR, second level is AND
+	es := [][]ASTTerm{}
 
-	terms := e.Left.Normalise()
-
-	if e.Right != nil {
-		for _, rhs := range e.Right {
-			terms = append(terms, rhs.Normalise()...)
+	if e.Paren != nil {
+		// This is where we recursively convert to DNF and also where negations
+		// get pushed down
+		normalised := e.Paren.Normalise()
+		for _, conjunction := range normalised.Or.Terms {
+			// Add one array per OR term, containing all the AND terms
+			es = append(es, conjunction.Terms)
 		}
+	} else {
+		es = append(es, []ASTTerm{e.Normalise()})
 	}
 
-	// At this point, every term is either:
-	// * a paren containing a disjunction with multiple conjunctions
-	// * a simple expression (no paren)
-	//
-	// The case of a paren containing a disjunction with a single
-	// conjunction already gets simplified when we normalise such parens.
+	return es
+}
 
-	exprs := [][][]EqualExpr{}
-	for _, term := range terms {
-
-		es := [][]EqualExpr{}
-
-		if term.Paren != nil {
-			// This paren should always be a disjunction with at least 2 terms,
-			// since the paren was already normalised
-			if len(term.Paren.Nested.Or.Right) == 0 {
-				panic("AndExpression::Normalise: unnormalised paren: this is a bug! ")
-			}
-
-			ts := []EqualExpr{term.Paren.Nested.Or.Left.Left}
-			for _, t := range term.Paren.Nested.Or.Left.Right {
-				ts = append(ts, t.Expr)
-			}
-
-			es = append(es, ts)
-
-			for _, rhs := range term.Paren.Nested.Or.Right {
-				ts := []EqualExpr{rhs.Expr.Left}
-				for _, t := range rhs.Expr.Right {
-					ts = append(ts, t.Expr)
-				}
-				es = append(es, ts)
-			}
-		} else {
-			es = append(es, []EqualExpr{term})
-		}
-
-		exprs = append(exprs, es)
+func (e *AndExpression) Normalise() []ASTAnd {
+	// We have an AND node and all its terms are ASTs with potential nesting.
+	// We can eliminate nesting by normalising the parens (which will recurse into
+	// the sub-ASTs and flatten them into DNF), and then construct an array
+	// with for every term a nested array representing the OR and AND nodes.
+	terms := [][][]ASTTerm{e.Left.convertToTerms()}
+	for _, rhs := range e.Right {
+		terms = append(terms, rhs.Expr.convertToTerms())
 	}
 
-	// Calculate the cross product, this distributes the outer AND into the OR
-	product := [][]EqualExpr{{}}
+	// Calculate the cross product, this distributes the outer AND into the nested ORs
+	// and gives us a new AST that has no nested disjunctions
+	ast := []ASTAnd{{
+		Terms: []ASTTerm{},
+	}}
 
-	for _, a := range exprs {
-		results := [][]EqualExpr{}
-		for _, r := range product {
-			for _, b := range a {
-				result := slices.Clone(r)
-				result = append(result, b...)
-				results = append(results, result)
+	for _, disjunctions := range terms {
+		// The part of the AST that we construct in this step
+		// This starts off empty at every step, and we fill it up based on the
+		// AST that we build in the previous step, until we're done.
+		tmpAst := []ASTAnd{}
+		for _, conjunction := range ast {
+			for _, terms := range disjunctions {
+				// Copy the conjunction with the terms collected so far
+				combined := slices.Clone(conjunction.Terms)
+				// Add the additional terms found in this step
+				combined = append(combined, terms...)
+				// Add the new AND node to the AST that we're building
+				tmpAst = append(tmpAst, ASTAnd{Terms: combined})
 			}
 		}
-		product = results
+		ast = tmpAst
 	}
 
-	conjunctions := []AndExpression{}
-	for _, p := range product {
-		var right []*AndRHS
-		for _, r := range p[1:] {
-			if right == nil {
-				right = []*AndRHS{}
-			}
-			right = append(right, &AndRHS{
-				Expr: r,
-			})
-		}
-		conjunctions = append(conjunctions, AndExpression{
-			Left:  p[0],
-			Right: right,
-		})
-	}
-
-	return conjunctions
+	return ast
 }
 
 func (e *AndExpression) invert() *OrExpression {
@@ -286,10 +259,8 @@ type AndRHS struct {
 	Expr EqualExpr `parser:"(And | 'AND' | 'and') @@"`
 }
 
-func (e *AndRHS) Normalise() []EqualExpr {
-	terms := []EqualExpr{}
-	terms = append(terms, e.Expr.Normalise()...)
-	return terms
+func (e *AndRHS) Normalise() ASTTerm {
+	return e.Expr.Normalise()
 }
 
 func (e *AndRHS) invert() *OrRHS {
@@ -316,57 +287,39 @@ type EqualExpr struct {
 
 // Normalise on an EqualExpr can return multiple EqualExpr if the expression
 // was a Paren with only nested conjunctions that was simplified.
-func (e *EqualExpr) Normalise() []EqualExpr {
+func (e *EqualExpr) Normalise() ASTTerm {
 
 	if e.Paren != nil {
-		normalised := e.Paren.Normalise()
-
-		// Remove parentheses that only contain a conjunction
-		// (i.e. the OR only has a single child)
-		if len(normalised.Nested.Or.Right) == 0 {
-			// The terms in the nested conjunction
-			right := normalised.Nested.Or.Left.Right
-			// The exprs to return
-			exprs := make([]EqualExpr, 0, 1+len(right))
-
-			exprs = append(exprs, normalised.Nested.Or.Left.Left)
-
-			for _, expr := range right {
-				exprs = append(exprs, expr.Expr)
-			}
-
-			return exprs
-		} else {
-			return []EqualExpr{{Paren: normalised}}
-		}
+		panic("Called EqualExpr::Normalise on a paren, this is a bug!")
 	}
 
 	if e.LessThan != nil {
-		return []EqualExpr{{LessThan: e.LessThan.Normalise()}}
+		return ASTTerm{
+			LessThan: e.LessThan.Normalise()}
 	}
 
 	if e.LessOrEqualThan != nil {
-		return []EqualExpr{{LessOrEqualThan: e.LessOrEqualThan.Normalise()}}
+		return ASTTerm{LessOrEqualThan: e.LessOrEqualThan.Normalise()}
 	}
 
 	if e.GreaterThan != nil {
-		return []EqualExpr{{GreaterThan: e.GreaterThan.Normalise()}}
+		return ASTTerm{GreaterThan: e.GreaterThan.Normalise()}
 	}
 
 	if e.GreaterOrEqualThan != nil {
-		return []EqualExpr{{GreaterOrEqualThan: e.GreaterOrEqualThan.Normalise()}}
+		return ASTTerm{GreaterOrEqualThan: e.GreaterOrEqualThan.Normalise()}
 	}
 
 	if e.Glob != nil {
-		return []EqualExpr{{Glob: e.Glob.Normalise()}}
+		return ASTTerm{Glob: e.Glob.Normalise()}
 	}
 
 	if e.Assign != nil {
-		return []EqualExpr{{Assign: e.Assign.Normalise()}}
+		return ASTTerm{Assign: e.Assign.Normalise()}
 	}
 
 	if e.Inclusion != nil {
-		return []EqualExpr{{Inclusion: e.Inclusion.Normalise()}}
+		return ASTTerm{Inclusion: e.Inclusion.Normalise()}
 	}
 
 	panic("This should not happen!")
@@ -413,17 +366,14 @@ type Paren struct {
 	Nested Expression `parser:"LParen @@ RParen"`
 }
 
-func (e *Paren) Normalise() *Paren {
+func (e *Paren) Normalise() *ASTExpr {
 	nested := e.Nested
 
 	if e.IsNot {
 		nested = *nested.invert()
 	}
 
-	return &Paren{
-		IsNot:  false,
-		Nested: *nested.Normalise(),
-	}
+	return nested.Normalise()
 }
 
 func (e *Paren) invert() *Paren {
@@ -640,7 +590,7 @@ var Parser = participle.MustBuild[TopLevel](
 	participle.Unquote("String"),
 )
 
-func Parse(s string, log *slog.Logger) (*TopLevel, error) {
+func Parse(s string, log *slog.Logger) (*AST, error) {
 	log.Info("parsing query", "query", s)
 
 	v, err := Parser.ParseString("", s)

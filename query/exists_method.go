@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (t *TopLevel) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
+func (t *AST) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 	builder := QueryBuilder{
 		options:      *options,
 		queryBuilder: &strings.Builder{},
@@ -22,47 +22,6 @@ func (t *TopLevel) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 		},
 		" ",
 	))
-
-	if builder.options.IncludeData != nil {
-		if builder.options.IncludeData.Owner {
-			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN string_attributes AS ownerAttrs INDEXED BY string_attributes_entity_kv_idx"+
-					" ON e.entity_key = ownerAttrs.entity_key"+
-					" AND e.from_block = ownerAttrs.from_block"+
-					" AND ownerAttrs.key = '%s'",
-				OwnerAttributeKey,
-			)
-		}
-		if builder.options.IncludeData.Expiration {
-			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS expirationAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
-					" ON e.entity_key = expirationAttrs.entity_key"+
-					" AND e.from_block = expirationAttrs.from_block"+
-					" AND expirationAttrs.key = '%s'",
-				ExpirationAttributeKey,
-			)
-		}
-		if builder.options.IncludeData.CreatedAtBlock {
-			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS createdAtBlockAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
-					" ON e.entity_key = createdAtBlockAttrs.entity_key"+
-					" AND e.from_block = createdAtBlockAttrs.from_block"+
-					" AND createdAtBlockAttrs.key = '%s'",
-				CreatedAtBlockKey,
-			)
-		}
-		if builder.options.IncludeData.LastModifiedAtBlock ||
-			options.IncludeData.TransactionIndexInBlock ||
-			options.IncludeData.OperationIndexInTransaction {
-			fmt.Fprintf(builder.queryBuilder,
-				" INNER JOIN numeric_attributes AS sequenceAttrs INDEXED BY numeric_attributes_entity_kv_idx"+
-					" ON e.entity_key = sequenceAttrs.entity_key"+
-					" AND e.from_block = sequenceAttrs.from_block"+
-					" AND sequenceAttrs.key = '%s'",
-				SequenceAttributeKey,
-			)
-		}
-	}
 
 	for i, orderBy := range builder.options.OrderByAnnotations {
 		tableName := ""
@@ -110,8 +69,8 @@ func (t *TopLevel) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 	blockArg := builder.pushArgument(builder.options.AtBlock)
 	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
-	if t.Expression != nil {
-		t.Expression.addConditions(&builder)
+	if t.Expr != nil {
+		t.Expr.addConditions(&builder)
 	}
 
 	builder.queryBuilder.WriteString(" ORDER BY ")
@@ -134,33 +93,33 @@ func (t *TopLevel) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 	}, nil
 }
 
-func (e *Expression) addConditions(b *QueryBuilder) {
+func (e *ASTExpr) addConditions(b *QueryBuilder) {
 	e.Or.addConditions(b)
 }
 
-func (e *OrExpression) addConditions(b *QueryBuilder) {
+func (e *ASTOr) addConditions(b *QueryBuilder) {
 	b.queryBuilder.WriteString(" AND (")
-	e.Left.addConditions(b)
+	e.Terms[0].addConditions(b)
 
-	for _, r := range e.Right {
+	for _, r := range e.Terms[1:] {
 		b.queryBuilder.WriteString(") OR (")
-		r.Expr.addConditions(b)
+		r.addConditions(b)
 	}
 
 	b.queryBuilder.WriteString(")")
 }
 
-func (e *AndExpression) addConditions(b *QueryBuilder) {
-	e.Left.addConditions(b)
+func (e *ASTAnd) addConditions(b *QueryBuilder) {
+	e.Terms[0].addConditions(b)
 
-	for _, r := range e.Right {
+	for _, r := range e.Terms[1:] {
 		b.queryBuilder.WriteString(" AND ")
-		r.Expr.addConditions(b)
+		r.addConditions(b)
 	}
 
 }
 
-func (e *EqualExpr) addConditions(b *QueryBuilder) {
+func (e *ASTTerm) addConditions(b *QueryBuilder) {
 	var (
 		attrType  string
 		key       string
@@ -173,10 +132,10 @@ func (e *EqualExpr) addConditions(b *QueryBuilder) {
 		val := e.Assign.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(val.String)
+			value = b.pushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(val.Number)
+			value = b.pushArgument(*val.Number)
 		}
 
 		operation = "="
@@ -218,10 +177,10 @@ func (e *EqualExpr) addConditions(b *QueryBuilder) {
 		val := e.LessThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(val.String)
+			value = b.pushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(val.Number)
+			value = b.pushArgument(*val.Number)
 		}
 		operation = "<"
 	} else if e.LessOrEqualThan != nil {
@@ -229,10 +188,10 @@ func (e *EqualExpr) addConditions(b *QueryBuilder) {
 		val := e.LessOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(val.String)
+			value = b.pushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(val.Number)
+			value = b.pushArgument(*val.Number)
 		}
 		operation = "<="
 	} else if e.GreaterThan != nil {
@@ -240,10 +199,10 @@ func (e *EqualExpr) addConditions(b *QueryBuilder) {
 		val := e.GreaterThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(val.String)
+			value = b.pushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(val.Number)
+			value = b.pushArgument(*val.Number)
 		}
 		operation = ">"
 	} else if e.GreaterOrEqualThan != nil {
@@ -251,10 +210,10 @@ func (e *EqualExpr) addConditions(b *QueryBuilder) {
 		val := e.GreaterOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(val.String)
+			value = b.pushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(val.Number)
+			value = b.pushArgument(*val.Number)
 		}
 		operation = ">="
 	} else if e.Glob != nil {

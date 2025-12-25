@@ -777,7 +777,7 @@ func (s *SQLiteStore) QueryEntitiesInternalIterator(
 		elapsed := time.Since(startTime)
 		s.log.Info("query execution time", "seconds", elapsed.Seconds(), "query", originalQuery)
 
-		if elapsed.Seconds() > 0 {
+		if elapsed.Seconds() > 1 {
 			rows, err := s.readPool.QueryContext(
 				ctx,
 				fmt.Sprintf("explain query plan %s", evaluatedQuery.Query),

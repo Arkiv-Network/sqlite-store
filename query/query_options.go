@@ -108,19 +108,19 @@ func NewQueryOptions(log *slog.Logger, latestHead uint64, options *InternalQuery
 	if options.IncludeData.Owner {
 		queryOptions.Columns = append(queryOptions.Columns, Column{
 			Name:          "owner",
-			QualifiedName: "ownerAttrs.Value",
+			QualifiedName: fmt.Sprintf("e.string_attributes ->> '$.%s'", OwnerAttributeKey),
 		})
 	}
 	if options.IncludeData.Expiration {
 		queryOptions.Columns = append(queryOptions.Columns, Column{
 			Name:          "expires_at",
-			QualifiedName: "expirationAttrs.Value",
+			QualifiedName: fmt.Sprintf("e.numeric_attributes ->> '$.%s'", ExpirationAttributeKey),
 		})
 	}
 	if options.IncludeData.CreatedAtBlock {
 		queryOptions.Columns = append(queryOptions.Columns, Column{
 			Name:          "created_at_block",
-			QualifiedName: "createdAtBlockAttrs.Value",
+			QualifiedName: fmt.Sprintf("e.numeric_attributes ->> '$.%s'", CreatedAtBlockKey),
 		})
 	}
 	if options.IncludeData.LastModifiedAtBlock ||
@@ -128,7 +128,7 @@ func NewQueryOptions(log *slog.Logger, latestHead uint64, options *InternalQuery
 		options.IncludeData.OperationIndexInTransaction {
 		queryOptions.Columns = append(queryOptions.Columns, Column{
 			Name:          "sequence",
-			QualifiedName: "sequenceAttrs.Value",
+			QualifiedName: fmt.Sprintf("e.numeric_attributes ->> '$.%s'", SequenceAttributeKey),
 		})
 	}
 
