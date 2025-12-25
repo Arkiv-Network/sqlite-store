@@ -5,7 +5,11 @@ import (
 	"strings"
 )
 
-func (t *AST) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
+type ExistsEvaluator struct{}
+
+var _ QueryEvaluator = ExistsEvaluator{}
+
+func (e ExistsEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQuery, error) {
 	builder := QueryBuilder{
 		options:      *options,
 		queryBuilder: &strings.Builder{},
@@ -69,8 +73,11 @@ func (t *AST) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 	blockArg := builder.pushArgument(builder.options.AtBlock)
 	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
-	if t.Expr != nil {
-		t.Expr.addConditions(&builder)
+	if ast.Expr != nil {
+		err := e.addOrConditions(&ast.Expr.Or, &builder)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	builder.queryBuilder.WriteString(" ORDER BY ")
@@ -93,33 +100,45 @@ func (t *AST) EvaluateExists(options *QueryOptions) (*SelectQuery, error) {
 	}, nil
 }
 
-func (e *ASTExpr) addConditions(b *QueryBuilder) {
-	e.Or.addConditions(b)
-}
-
-func (e *ASTOr) addConditions(b *QueryBuilder) {
+func (e ExistsEvaluator) addOrConditions(expr *ASTOr, b *QueryBuilder) error {
 	b.queryBuilder.WriteString(" AND (")
-	e.Terms[0].addConditions(b)
 
-	for _, r := range e.Terms[1:] {
+	err := e.addAndConditions(&expr.Terms[0], b)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range expr.Terms[1:] {
 		b.queryBuilder.WriteString(") OR (")
-		r.addConditions(b)
+		err = e.addAndConditions(&r, b)
+		if err != nil {
+			return err
+		}
 	}
 
 	b.queryBuilder.WriteString(")")
+
+	return nil
 }
 
-func (e *ASTAnd) addConditions(b *QueryBuilder) {
-	e.Terms[0].addConditions(b)
-
-	for _, r := range e.Terms[1:] {
-		b.queryBuilder.WriteString(" AND ")
-		r.addConditions(b)
+func (e ExistsEvaluator) addAndConditions(expr *ASTAnd, b *QueryBuilder) error {
+	err := e.addTermConditions(&expr.Terms[0], b)
+	if err != nil {
+		return err
 	}
 
+	for _, r := range expr.Terms[1:] {
+		b.queryBuilder.WriteString(" AND ")
+		err = e.addTermConditions(&r, b)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (e *ASTTerm) addConditions(b *QueryBuilder) {
+func (ExistsEvaluator) addTermConditions(term *ASTTerm, b *QueryBuilder) error {
 	var (
 		attrType  string
 		key       string
@@ -127,9 +146,9 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 		value     string
 	)
 
-	if e.Assign != nil {
-		key = b.pushArgument(e.Assign.Var)
-		val := e.Assign.Value
+	if term.Assign != nil {
+		key = b.pushArgument(term.Assign.Var)
+		val := term.Assign.Value
 		if val.String != nil {
 			attrType = "string"
 			value = b.pushArgument(*val.String)
@@ -139,19 +158,19 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 		}
 
 		operation = "="
-		if e.Assign.IsNot {
+		if term.Assign.IsNot {
 			operation = "!="
 		}
-	} else if e.Inclusion != nil {
-		key = b.pushArgument(e.Inclusion.Var)
+	} else if term.Inclusion != nil {
+		key = b.pushArgument(term.Inclusion.Var)
 		var values []string
 		attrType = "string"
-		if len(e.Inclusion.Values.Strings) > 0 {
-			values = make([]string, 0, len(e.Inclusion.Values.Strings))
-			for _, value := range e.Inclusion.Values.Strings {
-				if e.Inclusion.Var == OwnerAttributeKey ||
-					e.Inclusion.Var == CreatorAttributeKey ||
-					e.Inclusion.Var == KeyAttributeKey {
+		if len(term.Inclusion.Values.Strings) > 0 {
+			values = make([]string, 0, len(term.Inclusion.Values.Strings))
+			for _, value := range term.Inclusion.Values.Strings {
+				if term.Inclusion.Var == OwnerAttributeKey ||
+					term.Inclusion.Var == CreatorAttributeKey ||
+					term.Inclusion.Var == KeyAttributeKey {
 					values = append(values, b.pushArgument(strings.ToLower(value)))
 				} else {
 					values = append(values, b.pushArgument(value))
@@ -159,8 +178,8 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 			}
 		} else {
 			attrType = "numeric"
-			values = make([]string, 0, len(e.Inclusion.Values.Numbers))
-			for _, value := range e.Inclusion.Values.Numbers {
+			values = make([]string, 0, len(term.Inclusion.Values.Numbers))
+			for _, value := range term.Inclusion.Values.Numbers {
 				values = append(values, b.pushArgument(value))
 			}
 		}
@@ -169,12 +188,12 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 		value = fmt.Sprintf("(%s)", paramStr)
 
 		operation = "IN"
-		if e.Inclusion.IsNot {
+		if term.Inclusion.IsNot {
 			operation = "NOT IN"
 		}
-	} else if e.LessThan != nil {
-		key = b.pushArgument(e.LessThan.Var)
-		val := e.LessThan.Value
+	} else if term.LessThan != nil {
+		key = b.pushArgument(term.LessThan.Var)
+		val := term.LessThan.Value
 		if val.String != nil {
 			attrType = "string"
 			value = b.pushArgument(*val.String)
@@ -183,9 +202,9 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 			value = b.pushArgument(*val.Number)
 		}
 		operation = "<"
-	} else if e.LessOrEqualThan != nil {
-		key = b.pushArgument(e.LessOrEqualThan.Var)
-		val := e.LessOrEqualThan.Value
+	} else if term.LessOrEqualThan != nil {
+		key = b.pushArgument(term.LessOrEqualThan.Var)
+		val := term.LessOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
 			value = b.pushArgument(*val.String)
@@ -194,9 +213,9 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 			value = b.pushArgument(*val.Number)
 		}
 		operation = "<="
-	} else if e.GreaterThan != nil {
-		key = b.pushArgument(e.GreaterThan.Var)
-		val := e.GreaterThan.Value
+	} else if term.GreaterThan != nil {
+		key = b.pushArgument(term.GreaterThan.Var)
+		val := term.GreaterThan.Value
 		if val.String != nil {
 			attrType = "string"
 			value = b.pushArgument(*val.String)
@@ -205,9 +224,9 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 			value = b.pushArgument(*val.Number)
 		}
 		operation = ">"
-	} else if e.GreaterOrEqualThan != nil {
-		key = b.pushArgument(e.GreaterOrEqualThan.Var)
-		val := e.GreaterOrEqualThan.Value
+	} else if term.GreaterOrEqualThan != nil {
+		key = b.pushArgument(term.GreaterOrEqualThan.Var)
+		val := term.GreaterOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
 			value = b.pushArgument(*val.String)
@@ -216,18 +235,18 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 			value = b.pushArgument(*val.Number)
 		}
 		operation = ">="
-	} else if e.Glob != nil {
-		key = b.pushArgument(e.Glob.Var)
-		val := e.Glob.Value
+	} else if term.Glob != nil {
+		key = b.pushArgument(term.Glob.Var)
+		val := term.Glob.Value
 		attrType = "string"
 		value = b.pushArgument(val)
 
 		operation = "GLOB"
-		if e.Glob.IsNot {
+		if term.Glob.IsNot {
 			operation = "NOT GLOB"
 		}
 	} else {
-		panic("EqualExpr::addConditions: unnormalised expression, paren is non-nil")
+		return fmt.Errorf("EqualExpr::addConditions: unnormalised expression, paren is non-nil")
 	}
 
 	attrTable := "string_attributes"
@@ -258,4 +277,6 @@ func (e *ASTTerm) addConditions(b *QueryBuilder) {
 		},
 		" ",
 	))
+
+	return nil
 }
