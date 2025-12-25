@@ -294,8 +294,7 @@ func (e *EqualExpr) Normalise() ASTTerm {
 	}
 
 	if e.LessThan != nil {
-		return ASTTerm{
-			LessThan: e.LessThan.Normalise()}
+		return ASTTerm{LessThan: e.LessThan.Normalise()}
 	}
 
 	if e.LessOrEqualThan != nil {

@@ -668,7 +668,7 @@ func (s *SQLiteStore) QueryEntities(
 		}
 	}
 
-	expr, err := query.Parse(req, s.log)
+	ast, err := query.Parse(req, s.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse query: %w", err)
 	}
@@ -691,7 +691,7 @@ func (s *SQLiteStore) QueryEntities(
 
 	s.log.Info("final query options", "options", queryOptions)
 
-	evaluatedQuery, err := expr.EvaluateExists(queryOptions)
+	evaluatedQuery, err := query.ExistsEvaluator{}.EvaluateAST(ast, queryOptions)
 	if err != nil {
 		return nil, err
 	}

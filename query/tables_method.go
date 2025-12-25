@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+type TablesEvaluator struct{}
+
+var _ QueryEvaluator = TablesEvaluator{}
+
 func (b *QueryBuilder) createLeafQuery(query string) string {
 	tableName := b.nextTableName()
 
@@ -17,8 +21,7 @@ func (b *QueryBuilder) createLeafQuery(query string) string {
 	return tableName
 }
 
-// TODO implement this on the AST instead
-func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
+func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQuery, error) {
 	builder := QueryBuilder{
 		options:      *options,
 		queryBuilder: &strings.Builder{},
@@ -27,13 +30,13 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 		needsWhere:   true,
 	}
 
-	if t.Expression != nil {
+	if ast.Expr != nil {
 		builder.queryBuilder.WriteString(strings.Join(
 			[]string{
 				" SELECT",
 				builder.options.columnString(),
 				"FROM",
-				t.Expression.Evaluate(&builder),
+				e.EvaluateExpr(ast.Expr, &builder),
 				"AS keys INNER JOIN payloads AS e INDEXED BY payloads_entity_key_index ON keys.entity_key = e.entity_key AND keys.from_block = e.from_block",
 			},
 			" ",
@@ -111,17 +114,17 @@ func (t *TopLevel) Evaluate(options *QueryOptions) (*SelectQuery, error) {
 	}, nil
 }
 
-func (e *Expression) Evaluate(builder *QueryBuilder) string {
+func (e TablesEvaluator) EvaluateExpr(expr *ASTExpr, builder *QueryBuilder) string {
 	builder.queryBuilder.WriteString("WITH ")
-	return e.Or.Evaluate(builder)
+	return e.EvaluateOr(&expr.Or, builder)
 }
 
-func (e *OrExpression) Evaluate(b *QueryBuilder) string {
-	leftTable := e.Left.Evaluate(b)
+func (e TablesEvaluator) EvaluateOr(expr *ASTOr, b *QueryBuilder) string {
+	leftTable := e.EvaluateAnd(&expr.Terms[0], b)
 	tableName := leftTable
 
-	for _, rhs := range e.Right {
-		rightTable := rhs.Evaluate(b)
+	for _, rhs := range expr.Terms[1:] {
+		rightTable := e.EvaluateAnd(&rhs, b)
 		tableName = b.nextTableName()
 
 		b.writeComma()
@@ -142,16 +145,12 @@ func (e *OrExpression) Evaluate(b *QueryBuilder) string {
 	return tableName
 }
 
-func (e *OrRHS) Evaluate(b *QueryBuilder) string {
-	return e.Expr.Evaluate(b)
-}
-
-func (e *AndExpression) Evaluate(b *QueryBuilder) string {
-	leftTable := e.Left.Evaluate(b)
+func (e TablesEvaluator) EvaluateAnd(expr *ASTAnd, b *QueryBuilder) string {
+	leftTable := e.EvaluateTerm(&expr.Terms[0], b)
 	tableName := leftTable
 
-	for _, rhs := range e.Right {
-		rightTable := rhs.Evaluate(b)
+	for _, rhs := range expr.Terms[1:] {
+		rightTable := e.EvaluateTerm(&rhs, b)
 		tableName = b.nextTableName()
 
 		b.writeComma()
@@ -172,55 +171,36 @@ func (e *AndExpression) Evaluate(b *QueryBuilder) string {
 	return tableName
 }
 
-func (e *AndRHS) Evaluate(b *QueryBuilder) string {
-	return e.Expr.Evaluate(b)
-}
-
-func (e *EqualExpr) Evaluate(b *QueryBuilder) string {
-	if e.Paren != nil {
-		return e.Paren.Evaluate(b)
+func (TablesEvaluator) EvaluateTerm(expr *ASTTerm, b *QueryBuilder) string {
+	if expr.LessThan != nil {
+		return expr.LessThan.Evaluate(b)
 	}
 
-	if e.LessThan != nil {
-		return e.LessThan.Evaluate(b)
+	if expr.LessOrEqualThan != nil {
+		return expr.LessOrEqualThan.Evaluate(b)
 	}
 
-	if e.LessOrEqualThan != nil {
-		return e.LessOrEqualThan.Evaluate(b)
+	if expr.GreaterThan != nil {
+		return expr.GreaterThan.Evaluate(b)
 	}
 
-	if e.GreaterThan != nil {
-		return e.GreaterThan.Evaluate(b)
+	if expr.GreaterOrEqualThan != nil {
+		return expr.GreaterOrEqualThan.Evaluate(b)
 	}
 
-	if e.GreaterOrEqualThan != nil {
-		return e.GreaterOrEqualThan.Evaluate(b)
+	if expr.Glob != nil {
+		return expr.Glob.Evaluate(b)
 	}
 
-	if e.Glob != nil {
-		return e.Glob.Evaluate(b)
+	if expr.Assign != nil {
+		return expr.Assign.Evaluate(b)
 	}
 
-	if e.Assign != nil {
-		return e.Assign.Evaluate(b)
-	}
-
-	if e.Inclusion != nil {
-		return e.Inclusion.Evaluate(b)
+	if expr.Inclusion != nil {
+		return expr.Inclusion.Evaluate(b)
 	}
 
 	panic("This should not happen!")
-}
-
-func (e *Paren) Evaluate(b *QueryBuilder) string {
-	expr := e.Nested
-	// If we have a negation, we will push it down into the expression
-	if e.IsNot {
-		expr = *e.Nested.invert()
-	}
-	// We don't have to do anything here regarding precedence, the parsing order
-	// is already taking care of precedence since the nested OR node will create a subquery
-	return expr.Or.Evaluate(b)
 }
 
 func (b *QueryBuilder) createAnnotationQuery(
