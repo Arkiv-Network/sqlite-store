@@ -71,7 +71,7 @@ func main() {
 
 			elapsed := time.Since(startTime)
 
-			logger.Info("query completed", "executionTime", elapsed.Seconds())
+			logger.Info("query completed", "executionTime", elapsed.Seconds(), "entities", len(response.Data))
 
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
