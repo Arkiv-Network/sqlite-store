@@ -34,7 +34,7 @@ func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		builder.queryBuilder.WriteString(strings.Join(
 			[]string{
 				" SELECT",
-				builder.options.columnString(),
+				builder.options.ColumnString(),
 				"FROM",
 				e.EvaluateExpr(ast.Expr, &builder),
 				"AS keys INNER JOIN payloads AS e INDEXED BY payloads_entity_key_index ON keys.entity_key = e.entity_key AND keys.from_block = e.from_block",
@@ -45,7 +45,7 @@ func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		builder.queryBuilder.WriteString(strings.Join(
 			[]string{
 				"SELECT",
-				builder.options.columnString(),
+				builder.options.ColumnString(),
 				"FROM payloads AS e",
 			},
 			" ",

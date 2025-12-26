@@ -21,7 +21,7 @@ func (e ExistsEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 	builder.queryBuilder.WriteString(strings.Join(
 		[]string{
 			"SELECT",
-			builder.options.columnString(),
+			builder.options.ColumnString(),
 			"FROM payloads AS e",
 		},
 		" ",

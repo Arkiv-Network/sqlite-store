@@ -191,7 +191,7 @@ func (opts *QueryOptions) GetColumnIndex(column string) (int, error) {
 	return ix, nil
 }
 
-func (opts *QueryOptions) columnString() string {
+func (opts *QueryOptions) ColumnString() string {
 	if len(opts.Columns) == 0 {
 		return "1"
 	}
