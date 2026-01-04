@@ -43,7 +43,7 @@ func (e ExistsEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 
 		sortingTable := fmt.Sprintf("arkiv_annotation_sorting%d", i)
 
-		keyPlaceholder := builder.pushArgument(orderBy.Name)
+		keyPlaceholder := builder.PushArgument(orderBy.Name)
 
 		fmt.Fprintf(builder.queryBuilder,
 			" LEFT JOIN %[1]s AS %s INDEXED BY %[4]s"+
@@ -58,7 +58,7 @@ func (e ExistsEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		)
 	}
 
-	err := builder.addPaginationArguments()
+	err := AddPaginationArguments(&builder)
 	if err != nil {
 		return nil, fmt.Errorf("error adding the pagination condition: %w", err)
 	}
@@ -70,7 +70,7 @@ func (e ExistsEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		builder.queryBuilder.WriteString(" AND ")
 	}
 
-	blockArg := builder.pushArgument(builder.options.AtBlock)
+	blockArg := builder.PushArgument(builder.options.AtBlock)
 	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
 	if ast.Expr != nil {
@@ -147,14 +147,14 @@ func (ExistsEvaluator) addTermConditions(term *ASTTerm, b *QueryBuilder) error {
 	)
 
 	if term.Assign != nil {
-		key = b.pushArgument(term.Assign.Var)
+		key = b.PushArgument(term.Assign.Var)
 		val := term.Assign.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(*val.String)
+			value = b.PushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(*val.Number)
+			value = b.PushArgument(*val.Number)
 		}
 
 		operation = "="
@@ -162,7 +162,7 @@ func (ExistsEvaluator) addTermConditions(term *ASTTerm, b *QueryBuilder) error {
 			operation = "!="
 		}
 	} else if term.Inclusion != nil {
-		key = b.pushArgument(term.Inclusion.Var)
+		key = b.PushArgument(term.Inclusion.Var)
 		var values []string
 		attrType = "string"
 		if len(term.Inclusion.Values.Strings) > 0 {
@@ -171,16 +171,16 @@ func (ExistsEvaluator) addTermConditions(term *ASTTerm, b *QueryBuilder) error {
 				if term.Inclusion.Var == OwnerAttributeKey ||
 					term.Inclusion.Var == CreatorAttributeKey ||
 					term.Inclusion.Var == KeyAttributeKey {
-					values = append(values, b.pushArgument(strings.ToLower(value)))
+					values = append(values, b.PushArgument(strings.ToLower(value)))
 				} else {
-					values = append(values, b.pushArgument(value))
+					values = append(values, b.PushArgument(value))
 				}
 			}
 		} else {
 			attrType = "numeric"
 			values = make([]string, 0, len(term.Inclusion.Values.Numbers))
 			for _, value := range term.Inclusion.Values.Numbers {
-				values = append(values, b.pushArgument(value))
+				values = append(values, b.PushArgument(value))
 			}
 		}
 
@@ -192,54 +192,54 @@ func (ExistsEvaluator) addTermConditions(term *ASTTerm, b *QueryBuilder) error {
 			operation = "NOT IN"
 		}
 	} else if term.LessThan != nil {
-		key = b.pushArgument(term.LessThan.Var)
+		key = b.PushArgument(term.LessThan.Var)
 		val := term.LessThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(*val.String)
+			value = b.PushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(*val.Number)
+			value = b.PushArgument(*val.Number)
 		}
 		operation = "<"
 	} else if term.LessOrEqualThan != nil {
-		key = b.pushArgument(term.LessOrEqualThan.Var)
+		key = b.PushArgument(term.LessOrEqualThan.Var)
 		val := term.LessOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(*val.String)
+			value = b.PushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(*val.Number)
+			value = b.PushArgument(*val.Number)
 		}
 		operation = "<="
 	} else if term.GreaterThan != nil {
-		key = b.pushArgument(term.GreaterThan.Var)
+		key = b.PushArgument(term.GreaterThan.Var)
 		val := term.GreaterThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(*val.String)
+			value = b.PushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(*val.Number)
+			value = b.PushArgument(*val.Number)
 		}
 		operation = ">"
 	} else if term.GreaterOrEqualThan != nil {
-		key = b.pushArgument(term.GreaterOrEqualThan.Var)
+		key = b.PushArgument(term.GreaterOrEqualThan.Var)
 		val := term.GreaterOrEqualThan.Value
 		if val.String != nil {
 			attrType = "string"
-			value = b.pushArgument(*val.String)
+			value = b.PushArgument(*val.String)
 		} else {
 			attrType = "numeric"
-			value = b.pushArgument(*val.Number)
+			value = b.PushArgument(*val.Number)
 		}
 		operation = ">="
 	} else if term.Glob != nil {
-		key = b.pushArgument(term.Glob.Var)
+		key = b.PushArgument(term.Glob.Var)
 		val := term.Glob.Value
 		attrType = "string"
-		value = b.pushArgument(val)
+		value = b.PushArgument(val)
 
 		operation = "GLOB"
 		if term.Glob.IsNot {

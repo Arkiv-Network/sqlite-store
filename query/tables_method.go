@@ -65,7 +65,7 @@ func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 
 		sortingTable := fmt.Sprintf("arkiv_annotation_sorting%d", i)
 
-		keyPlaceholder := builder.pushArgument(orderBy.Name)
+		keyPlaceholder := builder.PushArgument(orderBy.Name)
 
 		fmt.Fprintf(builder.queryBuilder,
 			" LEFT JOIN %[1]s AS %s"+
@@ -79,7 +79,7 @@ func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		)
 	}
 
-	err := builder.addPaginationArguments()
+	err := AddPaginationArguments(&builder)
 	if err != nil {
 		return nil, fmt.Errorf("error adding the pagination condition: %w", err)
 	}
@@ -91,7 +91,7 @@ func (e TablesEvaluator) EvaluateAST(ast *AST, options *QueryOptions) (*SelectQu
 		builder.queryBuilder.WriteString(" AND ")
 	}
 
-	blockArg := builder.pushArgument(builder.options.AtBlock)
+	blockArg := builder.PushArgument(builder.options.AtBlock)
 	fmt.Fprintf(builder.queryBuilder, "%s BETWEEN e.from_block AND e.to_block - 1", blockArg)
 
 	builder.queryBuilder.WriteString(" ORDER BY ")
@@ -213,7 +213,7 @@ func (b *QueryBuilder) createAnnotationQuery(
 		tableName = "numeric_attributes"
 	}
 
-	blockArg := b.pushArgument(b.options.AtBlock)
+	blockArg := b.PushArgument(b.options.AtBlock)
 
 	return b.createLeafQuery(
 		strings.Join(
@@ -231,8 +231,8 @@ func (b *QueryBuilder) createAnnotationQuery(
 }
 
 func (e *Glob) Evaluate(b *QueryBuilder) string {
-	varArg := b.pushArgument(e.Var)
-	valArg := b.pushArgument(e.Value)
+	varArg := b.PushArgument(e.Var)
+	valArg := b.PushArgument(e.Value)
 
 	op := "GLOB"
 	if e.IsNot {
@@ -247,14 +247,14 @@ func (e *Glob) Evaluate(b *QueryBuilder) string {
 
 func (e *LessThan) Evaluate(b *QueryBuilder) string {
 	attrType := "string"
-	varArg := b.pushArgument(e.Var)
+	varArg := b.PushArgument(e.Var)
 	valArg := ""
 
 	if e.Value.String != nil {
-		valArg = b.pushArgument(*e.Value.String)
+		valArg = b.PushArgument(*e.Value.String)
 	} else {
 		attrType = "numeric"
-		valArg = b.pushArgument(*e.Value.Number)
+		valArg = b.PushArgument(*e.Value.Number)
 	}
 
 	return b.createAnnotationQuery(
@@ -265,14 +265,14 @@ func (e *LessThan) Evaluate(b *QueryBuilder) string {
 
 func (e *LessOrEqualThan) Evaluate(b *QueryBuilder) string {
 	attrType := "string"
-	varArg := b.pushArgument(e.Var)
+	varArg := b.PushArgument(e.Var)
 	valArg := ""
 
 	if e.Value.String != nil {
-		valArg = b.pushArgument(*e.Value.String)
+		valArg = b.PushArgument(*e.Value.String)
 	} else {
 		attrType = "numeric"
-		valArg = b.pushArgument(*e.Value.Number)
+		valArg = b.PushArgument(*e.Value.Number)
 	}
 
 	return b.createAnnotationQuery(
@@ -283,14 +283,14 @@ func (e *LessOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 func (e *GreaterThan) Evaluate(b *QueryBuilder) string {
 	attrType := "string"
-	varArg := b.pushArgument(e.Var)
+	varArg := b.PushArgument(e.Var)
 	valArg := ""
 
 	if e.Value.String != nil {
-		valArg = b.pushArgument(*e.Value.String)
+		valArg = b.PushArgument(*e.Value.String)
 	} else {
 		attrType = "numeric"
-		valArg = b.pushArgument(*e.Value.Number)
+		valArg = b.PushArgument(*e.Value.Number)
 	}
 
 	return b.createAnnotationQuery(
@@ -301,14 +301,14 @@ func (e *GreaterThan) Evaluate(b *QueryBuilder) string {
 
 func (e *GreaterOrEqualThan) Evaluate(b *QueryBuilder) string {
 	attrType := "string"
-	varArg := b.pushArgument(e.Var)
+	varArg := b.PushArgument(e.Var)
 	valArg := ""
 
 	if e.Value.String != nil {
-		valArg = b.pushArgument(*e.Value.String)
+		valArg = b.PushArgument(*e.Value.String)
 	} else {
 		attrType = "numeric"
-		valArg = b.pushArgument(*e.Value.Number)
+		valArg = b.PushArgument(*e.Value.Number)
 	}
 
 	return b.createAnnotationQuery(
@@ -319,7 +319,7 @@ func (e *GreaterOrEqualThan) Evaluate(b *QueryBuilder) string {
 
 func (e *Equality) Evaluate(b *QueryBuilder) string {
 	attrType := "string"
-	varArg := b.pushArgument(e.Var)
+	varArg := b.PushArgument(e.Var)
 	valArg := ""
 
 	op := "="
@@ -328,10 +328,10 @@ func (e *Equality) Evaluate(b *QueryBuilder) string {
 	}
 
 	if e.Value.String != nil {
-		valArg = b.pushArgument(*e.Value.String)
+		valArg = b.PushArgument(*e.Value.String)
 	} else {
 		attrType = "numeric"
-		valArg = b.pushArgument(*e.Value.Number)
+		valArg = b.PushArgument(*e.Value.Number)
 	}
 
 	return b.createAnnotationQuery(
@@ -350,9 +350,9 @@ func (e *Inclusion) Evaluate(b *QueryBuilder) string {
 			if e.Var == OwnerAttributeKey ||
 				e.Var == CreatorAttributeKey ||
 				e.Var == KeyAttributeKey {
-				values = append(values, b.pushArgument(strings.ToLower(value)))
+				values = append(values, b.PushArgument(strings.ToLower(value)))
 			} else {
-				values = append(values, b.pushArgument(value))
+				values = append(values, b.PushArgument(value))
 			}
 		}
 
@@ -360,7 +360,7 @@ func (e *Inclusion) Evaluate(b *QueryBuilder) string {
 		attrType = "numeric"
 		values = make([]string, 0, len(e.Values.Numbers))
 		for _, value := range e.Values.Numbers {
-			values = append(values, b.pushArgument(value))
+			values = append(values, b.PushArgument(value))
 		}
 	}
 
@@ -371,7 +371,7 @@ func (e *Inclusion) Evaluate(b *QueryBuilder) string {
 		condition = fmt.Sprintf("a.value NOT IN (%s)", paramStr)
 	}
 
-	keyArg := b.pushArgument(e.Var)
+	keyArg := b.PushArgument(e.Var)
 
 	return b.createAnnotationQuery(
 		attrType,
