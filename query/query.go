@@ -10,6 +10,16 @@ type SelectQuery struct {
 	Args  []any
 }
 
+// Builder type to allow defining generic functions that can be re-used in other
+// packages (like query-api)
+type Builder interface {
+	PushArgument(any) string
+	WriteWhereClause(string)
+	GetOptions() *QueryOptions
+}
+
+var _ Builder = &QueryBuilder{}
+
 type QueryBuilder struct {
 	queryBuilder *strings.Builder
 	args         []any
@@ -26,7 +36,7 @@ func (b *QueryBuilder) nextTableName() string {
 	return fmt.Sprintf("table_%d", b.tableCounter)
 }
 
-func (b *QueryBuilder) pushArgument(arg any) string {
+func (b *QueryBuilder) PushArgument(arg any) string {
 	b.args = append(b.args, arg)
 	b.argsCount += 1
 	return fmt.Sprintf("?%d", b.argsCount)
@@ -40,19 +50,36 @@ func (b *QueryBuilder) writeComma() {
 	}
 }
 
-func (b *QueryBuilder) addPaginationArguments() error {
+func (b *QueryBuilder) WriteWhereClause(s string) {
+	if b.needsWhere {
+		b.queryBuilder.WriteString(" WHERE ")
+		b.needsWhere = false
+	} else {
+		b.queryBuilder.WriteString(" AND ")
+	}
+
+	b.queryBuilder.WriteString("(")
+	b.queryBuilder.WriteString(s)
+	b.queryBuilder.WriteString(")")
+}
+
+func (b *QueryBuilder) GetOptions() *QueryOptions {
+	return &b.options
+}
+
+func AddPaginationArguments(b Builder) error {
 	paginationConditions := []string{}
 
-	if len(b.options.Cursor) > 0 {
+	if len(b.GetOptions().Cursor) > 0 {
 		// Pre-allocate argument counters so that we don't need to duplicate them below
-		args := make([]string, 0, len(b.options.Cursor))
-		for _, val := range b.options.Cursor {
-			args = append(args, b.pushArgument(val.Value))
+		args := make([]string, 0, len(b.GetOptions().Cursor))
+		for _, val := range b.GetOptions().Cursor {
+			args = append(args, b.PushArgument(val.Value))
 		}
 
-		for i := range b.options.Cursor {
+		for i := range b.GetOptions().Cursor {
 			subcondition := []string{}
-			for j, from := range b.options.Cursor {
+			for j, from := range b.GetOptions().Cursor {
 				if j > i {
 					break
 				}
@@ -67,11 +94,11 @@ func (b *QueryBuilder) addPaginationArguments() error {
 
 				arg := args[j]
 
-				columnIx, err := b.options.GetColumnIndex(from.ColumnName)
+				columnIx, err := b.GetOptions().GetColumnIndex(from.ColumnName)
 				if err != nil {
 					return fmt.Errorf("error getting column index: %w", err)
 				}
-				column := b.options.Columns[columnIx]
+				column := b.GetOptions().Columns[columnIx]
 
 				subcondition = append(
 					subcondition,
@@ -87,16 +114,7 @@ func (b *QueryBuilder) addPaginationArguments() error {
 
 		paginationCondition := strings.Join(paginationConditions, " OR ")
 
-		if b.needsWhere {
-			b.queryBuilder.WriteString(" WHERE ")
-			b.needsWhere = false
-		} else {
-			b.queryBuilder.WriteString(" AND ")
-		}
-
-		b.queryBuilder.WriteString("(")
-		b.queryBuilder.WriteString(paginationCondition)
-		b.queryBuilder.WriteString(")")
+		b.WriteWhereClause(paginationCondition)
 	}
 
 	return nil
